@@ -3,8 +3,10 @@ import { InView } from '@/components/ui/motion/motion-in-view';
 import { BorderTrail } from '@/components/ui/motion/motion-border';
 import next from '@/lib/images/nextjs.png';
 import framer from '@/lib/images/framer.png';
+import { useTranslations } from 'next-intl';
 
 const Works = () => {
+  const t = useTranslations('Works');
   return (
     <div>
       <InView variants={{
@@ -15,30 +17,30 @@ const Works = () => {
       >
         <section className='text-3xl'>
           <div className="font-mono text-left font-extrabold mt-5 pt-5 sm:pt-0 sm:mt-10 text-foreground">
-            design approach
+            {t('design')}
           </div>
 
           <div className="text-left font-extralight font-koh tracking-widest mt-3 text-xl text-stone-600 italic">
-            Cores
+            {t('cores')}
           </div>
           <div className="text-left font-thin font-koh tracking-widest border-b pb-5 text-lg flex flex-col gap-1 sm:gap-0">
             {/* point 1 */}
             <div className='flex flex-col sm:flex-row justify-between text-black font-light dark:text-stone-200 sm:items-center'>
-              Lightning Loading
+              {t('lightning')}
               <div className='text-base font-thin'>
-                retaining attention & interest
+                {t('retaining')} & {t('interest')}
                 <span className='ml-1 bg-clip-text text-transparent bg-gradient-to-br from-green-600 font-light dark:font-thin to-gray-400 dark:to-green-200'>
-                  after 1.3s
+                  {t('after')} 1.3s
                 </span>
               </div>
             </div>
             {/* point 2 */}
             <div className='flex flex-col sm:flex-row justify-between text-black font-light dark:text-stone-200 sm:items-center'>
-              Responsive Pages
+              {t('responsive')}
               <div className='text-base font-thin'>
-                mobile 90%, desktops 10%;
+                {t('mobile')} 90%, {t('desktop')} 10%;
                 <span className='ml-1 bg-clip-text text-transparent bg-gradient-to-br from-green-600 font-light dark:font-thin to-gray-400 dark:to-green-200'>
-                  100% impressive
+                  100% {t('impressive')}
                 </span>
               </div>
             </div>
@@ -47,26 +49,26 @@ const Works = () => {
           <div className='h-5 sm:h-0' />
 
           <div className="text-left font-extralight font-koh tracking-widest mt-3 text-xl text-stone-600 italic">
-            Techniques
+            {t('techniques')}
           </div>
           <div className="text-left font-thin font-koh tracking-widest border-b pb-5 text-lg flex flex-col gap-1 sm:gap-0">
             {/* point 1 */}
             <div className='flex flex-col sm:flex-row justify-between text-black font-light dark:text-stone-200 sm:items-center'>
-              Attention flow
+              {t('attention')}
               <div className='text-base font-thin'>
-                sequence your readers to
+                {t('sequence')}
                 <span className='ml-1 bg-clip-text text-transparent bg-gradient-to-br from-cyan-600 font-light dark:font-thin to-gray-400 dark:to-cyan-200'>
-                  convince themselves
+                  {t('themselves')}
                 </span>
               </div>
             </div>
             {/* point 2 */}
             <div className='flex flex-col sm:flex-row justify-between text-black font-light dark:text-stone-200 sm:items-center'>
-              Visual Hierarchy
-              <div className='text-base font-thin'>
-                you'll read this later.
+              {t('visual')}
+              <div className='text-base text-foreground/20 font-thin'>
+                {t('later')}
                 <span className='ml-1 bg-clip-text text-transparent bg-gradient-to-br from-cyan-600 font-light dark:font-thin to-gray-400 dark:to-cyan-200'>
-                  Gotcha.
+                  {t('gotcha')}
                 </span>
               </div>
             </div>
@@ -75,26 +77,26 @@ const Works = () => {
           <div className='h-5 sm:h-0' />
 
           <div className="text-left font-extralight font-koh tracking-widest mt-3 text-xl text-stone-600 italic">
-            Deliveries
+            {t('deliveries')}
           </div>
           <div className="text-left font-thin font-koh tracking-widest pb-5 text-lg flex flex-col gap-1 sm:gap-0">
             {/* point 1 */}
             <div className='flex flex-col sm:flex-row justify-between text-black font-light dark:text-stone-200 sm:items-center'>
-              Unique Selling Point (USP)
+              {t('usp')}
               <div className='text-base font-thin'>
-                know what sells and
+                {t('know')}
                 <span className='ml-1 font-mono font-bold bg-clip-text text-transparent bg-gradient-to-br from-orange-600  dark:font-thin to-gray-400 dark:to-yellow-400'>
-                  EMPHASIZE
+                  {t('emphasize')}
                 </span>
               </div>
             </div>
             {/* point 2 */}
             <div className='flex flex-col sm:flex-row justify-between text-black font-light dark:text-stone-200 sm:items-center'>
-              Interaction Cues
+              {t('interaction')}
               <div className='text-base font-thin'>
-                make yourself
+                {t('yourself')}
                 <span className='ml-1 bg-clip-text font-medium text-transparent bg-gradient-to-br from-orange-600 dark:font-thin to-gray-400 dark:to-yellow-400'>
-                  approachable
+                  {t('approachable')}
                 </span>
               </div>
             </div>
@@ -102,7 +104,7 @@ const Works = () => {
         </section>
         <section className='text-3xl'>
           <div className="font-mono text-left font-extrabold mt-5 pt-5 sm:pt-0 sm:mt-10 text-foreground">
-            works
+            {t('works')}
           </div>
           <div className="text-left font-thin text-black dark:text-stone-300 font-koh tracking-widest mb-5 text-xl">
             {/* Build online presence with Webpage; <br />
@@ -119,23 +121,23 @@ const Works = () => {
               /> */}
               <DialogBasicOne
                 image={framer}
-                title="Webpage Development"
-                subtitle="Simple Pages"
+                title={t('webpage')}
+                subtitle={t('simple')}
                 link="/pricing"
-                goTo="Go to /pricing"
-                description="Webpages are crafted to deliver clear, visually appealing content."
-                block="Perfect for portfolios, landing pages, & showcasing your brand. Create an impactful first impression & captivate your audience effortlessly."
+                goTo={t('goTo')}
+                description={t('description')}
+                block={t('block')}
               />
             </div>
 
             <DialogBasicOne
               image={next}
-              title="Web Application Development"
-              subtitle="Powering Business"
+              title={t('application')}
+              subtitle={t('powering')}
               link="/contact"
-              goTo="Get quote"
-              description="Beyond static pages, offering interactive & dynamic solutions tailored to your needs."
-              block="Streamline business processes, boost engagement, & deliver seamless user experiences with custom web apps."
+              goTo={t('quote')}
+              description={t('description2')}
+              block={t('block')}
             />
 
           </div>

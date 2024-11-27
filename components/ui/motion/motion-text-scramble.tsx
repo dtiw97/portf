@@ -68,14 +68,14 @@ export function TextScramble({
         setIsAnimating(false);
         onScrambleComplete?.();
       }
-    }, speed * 1500);
+    }, speed * 1250);
   };
 
   useEffect(() => {
     if (!trigger) return;
 
     scramble();
-  }, [trigger]);
+  }, [children, trigger]);
 
   return (
     <MotionComponent className={className} {...props}>

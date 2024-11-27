@@ -2,8 +2,10 @@
 import React from 'react'
 import Link from 'next/link'
 import { Mail, MessageCircleMore } from 'lucide-react'
+import { useTranslations } from 'next-intl';
 
 const Pricing = () => {
+  const t = useTranslations('PricingPage');
   // Add contact details
   const emailAddress = "david.tiw.minjie@gmail.com"
   const whatsappNumber = "125552420"
@@ -12,50 +14,50 @@ const Pricing = () => {
 
   const pricingPlans = [
     {
-      title: "Free",
+      title: t('free'),
       price: "RM0",
-      description: "We can talk about it, but this is simply not possible. xD",
+      description: t('description'),
       features: [
-        "30 minutes consultation",
-        "Scope out needs",
-        "Key features & Highlights",
-        "Deliverables & Timeline",
-        "Nothing",
-        "Choose next plans"
+        t('consultation'),
+        t('scope'),
+        t('features'),
+        t('deliverables'),
+        t('nothing'),
+        t('next')
       ],
-      buttonText: "Don't click",
-      href: "#", // Placeholder link
+      buttonText: t('dontClick'),
+      href: `https://wa.me/${whatsappNumber}?text=${date}%20Hi%21%20I%27m%20interested%20in%20Web%20Page%20Development%20services%21`, // Placeholder link
     },
     {
-      title: "Web Page Development",
+      title: t('webpage'),
       price: "RM1750",
-      description: "Beautiful, lightning-fast, mobile-friendly webpages.",
+      description: t('description2'),
       features: [
-        "Custom webpage design tailored to your brand",
-        "Responsive layouts for optimal viewing",
-        "SEO optimization to enhance visibility",
-        "Integrated analytics to track visitor engagement",
-        "Ongoing support and maintenance",
-        "Custom domain setup"
+        t('custom'),
+        t('responsive'),
+        t('seo'),
+        t('analytics'),
+        t('support'),
+        t('domain')
       ],
-      buttonText: "Get Started",
+      buttonText: t('getStarted'),
       popular: true,
       href: `https://wa.me/${whatsappNumber}?text=${date}%20Hi%21%20I%27m%20interested%20in%20Web%20Page%20Development%20services%21`,
 
     },
     {
-      title: "Web App Development",
-      price: "Custom",
-      description: "Tailored solutions for complex applications.",
+      title: t('webapp'),
+      price: t('customPrice'),
+      description: t('description3'),
       features: [
-        "Scalable architecture to handle growth",
-        "API development for seamless integration",
-        "User authentication and authorization systems",
-        "Real-time data processing and updates",
-        "Mobile-friendly design for all devices",
-        "Comprehensive testing and quality assurance"
+        t('scalable'),
+        t('api'),
+        t('authentication'),
+        t('realTime'),
+        t('mobile'),
+        t('testing')
       ],
-      buttonText: "Contact Sales",
+      buttonText: t('contactSales'),
       href: `https://wa.me/${whatsappNumber}?text=${date}%20Hi%21%20I%27m%20interested%20in%20Web%20App%20Development%20services%21`,
       // href: `mailto:${emailAddress}?subject=${date}%20Web%20App%20Development%20Enquiry&body=Hi%2C%20I%27m%20interested%20in%20Web%20App%20Development%20services.`,
     },
@@ -65,7 +67,9 @@ const Pricing = () => {
     <div className="max-w-screen-lg mx-auto">
       <div className="text-center mb-12 w-full">
         {/* <h2 className="text-3xl font-bold mb-4">Simple, transparent pricing</h2> */}
-        <h2 className="text-3xl font-semibold font-mono dark:text-stone-300 text-foreground">Simple, transparent pricing</h2>
+        <h2 className="text-3xl font-semibold font-mono dark:text-stone-300 text-foreground">
+          {t('title')}
+        </h2>
       </div>
 
       <div className="grid md:grid-cols-3 gap-8">
@@ -77,7 +81,9 @@ const Pricing = () => {
               <h3 className="text-xl font-thin">{plan.title}</h3>
               <div className="mt-2">
                 <span className={`text-3xl font-bold ${plan.popular ? 'text-emerald-500' : 'dark:text-gray-300 text-gray-500'}`}>{plan.price}</span>
-                {plan.price !== 'Custom' && <span className="text-gray-500">/month</span>}
+                {plan.price !== t('customPrice') && <span className="text-gray-500">
+                  /{t('month')}
+                </span>}
               </div>
               <p className={`mt-2 ${plan.popular ? 'text-emerald-500' : 'dark:text-stone-300 text-gray-500'}`}>{plan.description}</p>
             </div>
@@ -100,8 +106,8 @@ const Pricing = () => {
               target={plan.href.startsWith('https') ? '_blank' : undefined}
               rel={plan.href.startsWith('https') ? 'noopener noreferrer' : undefined}
               className={`mt-6 flex items-center justify-center gap-2 py-2 hover:font-extrabold hover:tracking-tight border-gray-500 px-4 rounded-md ${plan.popular
-                  ? 'bg-gradient-to-r from-emerald-500 from-60% via-teal-500 to-cyan-600 text-white hover:bg-emerald-600 shadow-lg hover:shadow-emerald-500/50'
-                  : 'bg-gray-800 text-white hover:bg-gray-700'
+                ? 'bg-gradient-to-r from-emerald-500 from-60% via-teal-500 to-cyan-600 text-white hover:bg-emerald-600 shadow-lg hover:shadow-emerald-500/50'
+                : 'bg-gray-800 text-white hover:bg-gray-700'
                 } transition-all hover:scale-105 duration-450`}
             >
               {plan.buttonText}
