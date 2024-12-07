@@ -37,7 +37,7 @@ export function DialogBasicOne({
     }
   };
 
-  const handleExampleClick = () => {
+  const handleExampleClick = (exampleLink: string) => {
     if (exampleLink) {
       window.open(exampleLink, '_blank');
     }
@@ -139,7 +139,7 @@ export function DialogBasicOne({
                           target='_blank' // Open link in a new tab
                           onClick={(e) => {
                             e.preventDefault(); // Prevent default link behavior
-                            handleExampleClick(); // Call handleClick to toggle dialog
+                            handleExampleClick(exampleLink || ''); // Call handleClick to toggle dialog
                           }}
                         >
                           {examples || ''}
@@ -155,7 +155,7 @@ export function DialogBasicOne({
                           target='_blank' // Open link in a new tab
                           onClick={(e) => {
                             e.preventDefault(); // Prevent default link behavior
-                            handleExampleClick(); // Call handleClick to toggle dialog
+                            handleExampleClick(exampleLink2 || ''); // Call handleClick to toggle dialog
                           }}
                         >
                           {examples2 || ''}
