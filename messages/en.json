@@ -49,7 +49,9 @@
     "powering": "Powering your business",
     "quote": "Get a quote",
     "block2": "Streamline business processes, boost engagement, & deliver seamless user experiences with custom web apps.",
-    "description2": "Beyond static pages, offering interactive & dynamic solutions tailored to your needs."
+    "description2": "Beyond static pages, offering interactive & dynamic solutions tailored to your needs.",
+    "examples": "see example one",
+    "examples2": "see example two"
   },
   "ContactPage": {
     "message": "Let us know what's on your mind",

@@ -20,14 +20,26 @@ interface DialogBasicOneProps {
   block: string;
   link?: string | null;
   goTo?: string | null;
+  examples?: string | null;
+  exampleLink?: string | null;
+  examples2?: string | null;
+  exampleLink2?: string | null;
 }
 
-export function DialogBasicOne({ image, imgdesc, title, subtitle, description, block, link, goTo }: DialogBasicOneProps) {
+export function DialogBasicOne({
+  image, imgdesc, title, subtitle, description, block, link, goTo, examples, exampleLink, examples2, exampleLink2
+}: DialogBasicOneProps) {
   const router = useRouter();
 
   const handleClick = () => {
     if (link) {
       router.push(link);
+    }
+  };
+
+  const handleExampleClick = () => {
+    if (exampleLink) {
+      window.open(exampleLink, '_blank');
     }
   };
 
@@ -116,6 +128,41 @@ export function DialogBasicOne({ image, imgdesc, title, subtitle, description, b
                   <div className='text-zinc-600 dark:text-zinc-300 text-lg'>
                     {block}
                   </div>
+                  <br />
+                  <div className='text-zinc-600 dark:text-zinc-300 text-lg'>
+                    {examples && (
+                      <div className='flex flex-row gap-2 items-center'>
+                        <Link
+                          className='mt-2 flex text-cyan-500 underline-offset-8'
+                          href={exampleLink || ''}
+                          rel='noopener noreferrer'
+                          target='_blank' // Open link in a new tab
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent default link behavior
+                            handleExampleClick(); // Call handleClick to toggle dialog
+                          }}
+                        >
+                          {examples || ''}
+                        </Link>
+                      </div>
+                    )}
+                    {examples2 && (
+                      <div className='flex flex-row gap-2 items-center'>
+                        <Link
+                          className='flex text-cyan-500 underline-offset-8'
+                          href={exampleLink2 || ''}
+                          rel='noopener noreferrer'
+                          target='_blank' // Open link in a new tab
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent default link behavior
+                            handleExampleClick(); // Call handleClick to toggle dialog
+                          }}
+                        >
+                          {examples2 || ''}
+                        </Link>
+                      </div>
+                    )}
+                  </div>
 
                   <Link
                     className='mt-2 flex justify-end text-orange-400 font-medium underline underline-offset-8'
@@ -128,14 +175,13 @@ export function DialogBasicOne({ image, imgdesc, title, subtitle, description, b
                   >
                     {goTo || ''}
                   </Link>
-
                 </DialogDescription>
               </div>
             </div>
             <DialogClose className='text-zinc-500' />
           </ScrollArea>
         </DialogContent>
-      </DialogContainer>
-    </Dialog>
+      </DialogContainer >
+    </Dialog >
   );
 }

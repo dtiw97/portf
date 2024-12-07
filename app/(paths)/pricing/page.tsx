@@ -3,6 +3,7 @@ import React from 'react'
 import Link from 'next/link'
 import { Mail, MessageCircleMore } from 'lucide-react'
 import { useTranslations } from 'next-intl';
+export const runtime = 'edge';
 
 const Pricing = () => {
   const t = useTranslations('PricingPage');

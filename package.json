@@ -3,7 +3,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "pages:build": "npx @cloudflare/next-on-pages"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.1.1",
@@ -21,6 +22,7 @@
     "geist": "^1.2.1",
     "lucide-react": "^0.436.0",
     "next": "latest",
+    "next-intl": "^3.26.0",
     "next-themes": "^0.3.0",
     "prettier": "^3.3.3",
     "react": "18.2.0",

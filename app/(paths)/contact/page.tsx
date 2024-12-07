@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Mail, MessageCircleMore } from 'lucide-react'
 import { useTranslations } from 'next-intl';
 
+export const runtime = 'edge';
 // Contact page component
 export default function ContactPage() {
   const t = useTranslations('ContactPage');
