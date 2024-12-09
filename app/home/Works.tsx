@@ -141,7 +141,7 @@ const Works = () => {
               link="/contact"
               goTo={t('quote')}
               description={t('description2')}
-              block={t('block')}
+              block={t('block2')}
             />
 
           </div>
