@@ -21,7 +21,8 @@ const Hero = () => {
           hidden: { opacity: 0, y: 15 },
           visible: { opacity: 1, y: 0 }
         }}
-          transition={{ duration: 0.5, ease: "easeInOut", delay: 0.25, once: true }}
+          transition={{ duration: 0.5, ease: "easeInOut", delay: 0.25 }}
+          viewOptions={{ once: true }}
 
         >
           <div className="font-thin tracking-widest">
@@ -39,7 +40,8 @@ const Hero = () => {
           hidden: { opacity: 0, y: 15 },
           visible: { opacity: 1, y: 0 }
         }}
-          transition={{ duration: 0.5, ease: "easeInOut", delay: 0.25, once: true }}
+          transition={{ duration: 0.5, ease: "easeInOut", delay: 0.25 }}
+          viewOptions={{ once: true }}
         >
           <div className="flex-1 text-black dark:text-stone-200 flex flex-col sm:flex-row items-left sm:items-center gap-0 sm:gap-2 font-extralight font-koh tracking-widest mt-4 sm:mt-0">
             {t('help')}
@@ -57,7 +59,8 @@ const Hero = () => {
         hidden: { opacity: 0, y: 15 },
         visible: { opacity: 1, y: 0 }
       }}
-        transition={{ duration: 0.5, ease: "easeInOut", delay: 0.35, once: true }}
+        transition={{ duration: 0.5, ease: "easeInOut", delay: 0.35 }}
+        viewOptions={{ once: true }}
       >
         <section>
           <div className="font-mono text-3xl text-left font-extrabold mt-5 pt-5 sm:pt-0 sm:mt-10 mb-2 text-foreground">

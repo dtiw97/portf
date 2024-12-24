@@ -13,7 +13,8 @@ const Works = () => {
         hidden: { opacity: 0, y: 15 },
         visible: { opacity: 1, y: 0 }
       }}
-        transition={{ duration: 0.5, ease: "easeInOut", delay: 0.5, once: true }}
+        transition={{ duration: 0.5, ease: "easeInOut", delay: 0.5 }}
+        viewOptions={{ once: true }}
       >
         <section className='text-3xl'>
           <div className="font-mono text-left font-extrabold mt-5 pt-5 sm:pt-0 sm:mt-10 text-foreground">
