@@ -61,12 +61,11 @@
   "PricingPage": {
     "title": "简单,透明的定价",
     "free": "免费",
-    "description": "我们可以讨论，但这基本不可能。xD",
+    "description": "我们可以讨论",
     "consultation": "30分钟咨询",
     "scope": "确定需求",
     "features": "关键特性与亮点",
     "deliverables": "交付物与时间表",
-    "nothing": "没有交付物",
     "next": "请选择下一个计划",
     "dontClick": "别点击",
 

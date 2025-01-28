@@ -23,7 +23,7 @@ const Pricing = () => {
         t('scope'),
         t('features'),
         t('deliverables'),
-        t('nothing'),
+        // t('nothing'),
         t('next')
       ],
       buttonText: t('dontClick'),
