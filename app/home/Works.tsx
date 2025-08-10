@@ -129,9 +129,9 @@ const Works = () => {
                 description={t('description')}
                 block={t('block')}
                 examples={t('examples')}
-                exampleLink="https://anotherprop.framer.website/"
+                exampleLink="https://noru.framer.website/"
                 examples2={t('examples2')}
-                exampleLink2="https://dtiwxyz.framer.website/"
+                exampleLink2="https://aiman-pt.framer.website/"
               />
             </div>
 

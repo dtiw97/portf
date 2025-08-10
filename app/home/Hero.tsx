@@ -10,7 +10,7 @@ const Hero = () => {
   const t = useTranslations('Hero');
   return (
 
-    <div className=" text-2xl">
+    <div className="text-2xl">
 
       <section className="flex flex-col justify-center">
         <TextScramble className="font-mono text-4xl text-left font-extrabold mb-5 sm:mb-5 text-foreground" characterSet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789">

@@ -13,7 +13,7 @@ export default function ContactPage() {
   const whatsappMessage = "Hi%21%20I%20would%20like%20to%20enquire%20about%20Web%20App%20Development!"
 
   return (
-    <div className="flex flex-col items-left justify-center">
+    <div className="flex flex-col items-left justify-center w-full">
       <h1 className="text-xl font-mono tracking-tighter font-medium mb-8 bg-gradient-to-r from-emerald-500 to-blue-400 bg-clip-text text-transparent">
         {t('message')}
       </h1>

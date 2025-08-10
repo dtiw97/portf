@@ -51,18 +51,18 @@ export default async function RootLayout({
                     <div className="flex items-end gap-2">
                       {/* <DeployButton /> */}<ThemeSwitcher />
                       <LocaleSwitcher />
+                      {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />}
                     </div>
-                    {/* {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />} */}
+
                   </div>
                 </nav>
 
-                <div className="flex flex-col gap-20 w-full p-5 items-left max-w-screen-lg dark:text-stone-400 text-stone-700 min-h-screen-3/4 ">
+                <div className="flex items-center flex-col gap-20 w-full max-w-screen-lg p-5 items-left dark:text-stone-400 text-stone-700 min-h-screen-3/4 ">
                   {children}
                 </div>
 
                 <footer className="bg-background bottom-0 w-full flex items-center justify-center border-t mx-auto text-center gap-8 py-3">
                   <div className="w-full max-w-screen-lg flex flex-row justify-between px-5 gap-5 items-center font-mono font-semibold">
-
                     <Footer />
                   </div>
                 </footer>
