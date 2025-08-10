@@ -51,7 +51,7 @@ export default async function RootLayout({
                     <div className="flex items-end gap-2">
                       {/* <DeployButton /> */}<ThemeSwitcher />
                       <LocaleSwitcher />
-                      {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />}
+                      {/* {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />} */}
                     </div>
 
                   </div>
