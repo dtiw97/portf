@@ -1,17 +1,17 @@
 {
   "Hero": {
-    "title": "欢迎来到 David 的网站",
+    "title": "欢迎来到 David Tiw Minjie 的主页",
     "intro": "我是一个",
-    "frontend": "前端开发人员",
-    "passion": "热情于",
-    "impressions": "不仅仅是美丽的网站，还有持久的印象。",
+    "frontend": "Go + React 开发人员",
+    "passion": "热衷于",
+    "impressions": "不仅是精美的设计，更是持久的印象。",
     "help": "我帮助企业",
     "create": "创建优秀的网站。",
-    "provide": "提供客户信心。",
+    "provide": "构建可扩展的应用程序。",
     "form": "形成销售渠道。",
-    "principles": "极简主义",
-    "nothing": "没有多余，每件都有它的目的。",
-    "such": "比如",
+    "principles": "极简主义原则",
+    "nothing": "只有信号，没有杂讯。",
+    "such": "比如这些",
     "shades": "阴影"
   },
   "Works": {
@@ -31,7 +31,7 @@
     "themselves": "让他们自己相信",
     "visual": "视觉层次",
     "later": "你稍后会看到这个。",
-    "gotcha": "被抓了",
+    "gotcha": "哈哈哈",
     "deliveries": "交付",
     "usp": "独特卖点 (USP)",
     "know": "知己知彼",
@@ -68,7 +68,6 @@
     "deliverables": "交付物与时间表",
     "next": "请选择下一个计划",
     "dontClick": "别点击",
-
     "webpage": "网页开发",
     "description2": "美丽、闪电般快速、适合移动设备的网页。",
     "custom": "量身定制的网页设计，符合您的品牌",
@@ -78,7 +77,6 @@
     "support": "持续支持和维护",
     "domain": "自定义域名设置",
     "getStarted": "开始使用",
-
     "webapp": "Web应用开发",
     "customPrice": "自定义",
     "description3": "为复杂应用提供量身定制的解决方案。",

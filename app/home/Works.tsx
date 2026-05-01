@@ -3,7 +3,9 @@ import { InView } from '@/components/ui/motion/motion-in-view';
 import { BorderTrail } from '@/components/ui/motion/motion-border';
 import next from '@/lib/images/nextjs.png';
 import framer from '@/lib/images/framer.png';
+import tbm from '@/lib/images/TBM.png';
 import { useTranslations } from 'next-intl';
+import { Thumb } from '@radix-ui/react-scroll-area';
 
 const Works = () => {
   const t = useTranslations('Works');
@@ -108,35 +110,12 @@ const Works = () => {
             {t('works')}
           </div>
           <div className="text-left font-thin text-black dark:text-stone-300 font-koh tracking-widest mb-5 text-xl">
-            {/* Build online presence with Webpage; <br />
-            Build business with Web Application. */}
+
           </div>
           <div className="relative p-1 rounded-xl flex flex-col sm:flex-row justify-between font-thin gap-4 font-koh tracking-widest">
-            <div className='relative w-full rounded-xl p-1'>
-              {/* <BorderTrail
-                style={{
-                  boxShadow:
-                    '0px 0px 60px 30px rgb(255 255 255 / 50%), 0 0 100px 60px rgb(0 0 0 / 50%), 0 0 140px 90px rgb(0 0 0 / 50%)',
-                }}
-                size={280}
-              /> */}
-              <DialogBasicOne
-                image={framer}
-                title={t('webpage')}
-                subtitle={t('simple')}
-                link="/pricing"
-                goTo={t('goTo')}
-                description={t('description')}
-                block={t('block')}
-                examples={t('examples')}
-                exampleLink="https://noru.framer.website/"
-                examples2={t('examples2')}
-                exampleLink2="https://aiman-pt.framer.website/"
-              />
-            </div>
 
             <DialogBasicOne
-              image={next}
+              image={tbm}
               title={t('application')}
               subtitle={t('powering')}
               link="/contact"
@@ -145,16 +124,21 @@ const Works = () => {
               block={t('block2')}
             />
 
-          </div>
-          {/* <div className='relative h-[200px] w-[300px] flex items-center justify-center rounded-md bg-zinc-200 px-5 py-2 dark:bg-zinc-900'>
-            <BorderTrail
-              style={{
-                boxShadow:
-                  '0px 0px 60px 30px rgb(255 255 255 / 50%), 0 0 100px 60px rgb(0 0 0 / 50%), 0 0 140px 90px rgb(0 0 0 / 50%)',
-              }}
-              size={100}
+            <DialogBasicOne
+              image={framer}
+              title={t('webpage')}
+              subtitle={t('simple')}
+              link="/pricing"
+              goTo={t('goTo')}
+              description={t('description')}
+              block={t('block')}
+              examples={t('examples')}
+              exampleLink="https://noru.framer.website/"
+              examples2={t('examples2')}
+              exampleLink2="https://aiman-pt.framer.website/"
             />
-          </div> */}
+
+          </div>
         </section>
       </InView>
     </div >

@@ -102,7 +102,7 @@ export function DialogBasicOne({
                 <DialogImage
                   src={getImageSrc(image)}
                   alt={imgdesc || ''}
-                  className='h-60 sm:h-80 w-full'
+                  className='h-60 sm:h-80 w-full aspect-video object-cover'
                 />
               </div>
               <div className='p-6 font-thin tracking-widest'>
