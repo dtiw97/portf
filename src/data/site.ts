@@ -2,9 +2,9 @@
 export const site = {
   name: "David Tiw Minjie",
   role: "Software engineer — React & Go",
-  email: "hello@example.com",
-  github: "https://github.com/",
-  linkedin: "https://www.linkedin.com/",
+  email: "davidtiwminjie@gmail.com",
+  github: "https://github.com/dtiw97",
+  linkedin: "https://www.linkedin.com/in/davidtiw/",
 };
 
 export const stack = [
