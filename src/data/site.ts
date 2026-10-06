@@ -2,7 +2,7 @@
 export const site = {
   name: "David Tiw Minjie",
   role: "Software engineer — React & Go",
-  email: "davidtiwminjie@gmail.com",
+  email: "david.tiw.minjie@gmail.com",
   github: "https://github.com/dtiw97",
   linkedin: "https://www.linkedin.com/in/davidtiw/",
 };
