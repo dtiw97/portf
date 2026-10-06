@@ -1,43 +1,25 @@
 {
+  "name": "portf",
+  "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "pages:build": "npx @cloudflare/next-on-pages"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "build:zhang": "node scripts/build-zhang.ts"
   },
   "dependencies": {
-    "@radix-ui/react-checkbox": "^1.1.1",
-    "@radix-ui/react-dropdown-menu": "^2.1.1",
-    "@radix-ui/react-label": "^2.1.0",
-    "@radix-ui/react-scroll-area": "^1.2.1",
-    "@radix-ui/react-slot": "^1.1.0",
-    "@supabase/ssr": "latest",
-    "@supabase/supabase-js": "latest",
-    "@tabler/icons-react": "^3.22.0",
-    "autoprefixer": "10.4.17",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "framer-motion": "^11.18.2",
-    "geist": "^1.2.1",
-    "lucide-react": "^0.436.0",
-    "motion": "^12.4.1",
-    "next": "latest",
-    "next-intl": "^3.26.0",
-    "next-themes": "^0.3.0",
-    "prettier": "^3.3.3",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "sharp": "^0.33.5"
+    "astro": "^7.3.5",
+    "three": "^0.186.1"
   },
   "devDependencies": {
-    "@types/node": "20.10.6",
-    "@types/react": "18.2.46",
-    "@types/react-dom": "18.2.18",
-    "postcss": "8.4.33",
-    "tailwind-merge": "^2.5.4",
-    "tailwindcss": "3.4.1",
-    "tailwindcss-animate": "^1.0.7",
-    "typescript": "5.3.3"
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^26.6.4",
+    "@types/pngjs": "^6.0.5",
+    "@types/three": "^0.186.0",
+    "pngjs": "^7.0.0",
+    "potrace": "^2.1.8",
+    "typescript": "^6.0.3"
   }
 }

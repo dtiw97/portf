@@ -1,0 +1,72 @@
+/*
+ * Design tokens — the foundation of the design system (WIP).
+ * Components consume semantic tokens (--color-*, --space-*, --dur-*),
+ * never raw values, so themes and scales can change in one place.
+ */
+:root {
+  /* Primitive palette: ink on paper, plus one seal-red accent. */
+  --ink-0: #000000;
+  --ink-1: #0b0b0b;
+  --ink-2: #151515;
+  --ink-3: #262626;
+  --ink-4: #4a4a4a;
+  --ink-5: #8a8a8a;
+  --ink-6: #bdbdbd;
+  --paper: #f7f6f2;
+  --seal: #c8312b;
+
+  /* Semantic colours. The site is dark-first; the loader is the only paper surface. */
+  --color-bg: var(--ink-0);
+  --color-surface: var(--ink-1);
+  --color-raised: var(--ink-2);
+  --color-line: var(--ink-3);
+  --color-text: #ededed;
+  --color-text-muted: var(--ink-5);
+  --color-text-faint: var(--ink-4);
+  --color-accent: var(--seal);
+
+  /* Type */
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+  --text-2xl: clamp(2.25rem, 1.6rem + 3vw, 4rem);
+  --text-display: clamp(3rem, 1.8rem + 6vw, 7.5rem);
+  --leading-tight: 1.05;
+  --leading-body: 1.6;
+  --tracking-caps: 0.14em;
+
+  /* Space (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+  --gutter: clamp(1rem, 4vw, 3rem);
+  --measure: 64ch;
+  --max-width: 76rem;
+
+  /* Motion. Intros always play (gentler under reduced motion). --dur-intro is shared by every project intro scene (see src/lib/motion.ts). */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 160ms;
+  --dur-base: 320ms;
+  --dur-slow: 700ms;
+  --dur-intro: 2400ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+}

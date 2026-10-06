@@ -1,0 +1,315 @@
+---
+import Base from "../layouts/Base.astro";
+import Loader from "../components/Loader.astro";
+import { projects, stack } from "../data/site";
+---
+
+<Base>
+  <Loader slot="before" />
+
+  <section class="hero wrap">
+    <p class="eyebrow rise">Software engineer · React & Go</p>
+    <h1 class="display rise" style="--d:80ms">
+      David<br />Tiw Minjie
+    </h1>
+    <p class="lede rise" style="--d:160ms">
+      I build React interfaces and Go services on Gin, from a real-time tunnel boring machine
+      simulator that writes to OPC UA to Solidity contracts on the EVM.
+    </p>
+    <p class="now rise" style="--d:240ms">
+      <span class="dot" aria-hidden="true"></span>
+      Now building a design system <span class="wip">WIP</span>
+    </p>
+  </section>
+
+  <section class="work wrap" id="work" aria-labelledby="work-title">
+    <h2 class="eyebrow" id="work-title">Selected work</h2>
+    <ol class="projects">
+      {
+        projects.map((p) => (
+          <li>
+            <a class="project" href={`/work/${p.slug}`}>
+              <span class="index">{p.index}</span>
+              <span class="glyph" aria-hidden="true">
+                {p.slug === "tbm-simulator" ? (
+                  <svg viewBox="0 0 48 48">
+                    {/* EPB cutterhead, face on: rim and gauge ring, flat centre with twin discs,
+                        six spokes each carrying two disc cutters. */}
+                    <g transform="translate(24 24)">
+                      <circle r="21" />
+                      <circle r="18" />
+                      <circle r="6" />
+                      <line x1="-1.6" y1="-2.5" x2="-1.6" y2="2.5" />
+                      <line x1="1.6" y1="-2.5" x2="1.6" y2="2.5" />
+                      {[0, 60, 120, 180, 240, 300].map((a) => (
+                        <g transform={`rotate(${a})`}>
+                          <rect x="-2.5" y="-18" width="5" height="12" />
+                          <line x1="-1.4" y1="-15" x2="1.4" y2="-15" />
+                          <line x1="-1.4" y1="-10.5" x2="1.4" y2="-10.5" />
+                        </g>
+                      ))}
+                    </g>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 48 48">
+                    <rect x="3" y="3" width="42" height="42" />
+                    {[0, 1, 2, 3].flatMap((r) =>
+                      [0, 1, 2, 3].map((c) =>
+                        (r * 7 + c * 3) % 5 < 2 ? (
+                          <rect class="bit" x={9 + c * 8} y={9 + r * 8} width="6" height="6" />
+                        ) : null,
+                      ),
+                    )}
+                  </svg>
+                )}
+              </span>
+              <span class="body">
+                <span class="kicker">{p.kicker}</span>
+                <span class="title">{p.title}</span>
+                <span class="summary">{p.summary}</span>
+                <span class="tags">
+                  {p.tags.map((t) => (
+                    <span class="tag">{t}</span>
+                  ))}
+                </span>
+              </span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="stack wrap" id="stack" aria-labelledby="stack-title">
+    <h2 class="eyebrow" id="stack-title">Stack</h2>
+    <dl class="groups">
+      {
+        stack.map((g) => (
+          <div class="group">
+            <dt>{g.group}</dt>
+            <dd>{g.items.join(" · ")}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+</Base>
+
+<style>
+  /* Carries the loader's dive: the hero arrives slightly over-zoomed and settles. */
+  .hero {
+    animation: settle 1400ms var(--ease-out) both;
+    transform-origin: 30% 50%;
+    min-height: calc(100svh - 4.5rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-6);
+    padding-block: var(--space-16);
+  }
+
+  .display {
+    font-size: var(--text-display);
+    font-weight: 600;
+    line-height: 0.92;
+    letter-spacing: -0.045em;
+  }
+
+  .lede {
+    max-width: 38ch;
+    font-size: var(--text-xl);
+    line-height: 1.35;
+    color: var(--color-text-muted);
+  }
+
+  .now {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+  }
+
+  .dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--color-accent);
+    animation: pulse 2.4s var(--ease-in-out) infinite;
+  }
+
+  .wip {
+    font-size: var(--text-xs);
+    color: var(--color-text-faint);
+    border: 1px solid var(--color-line);
+    padding: 0 0.35rem;
+  }
+
+  @keyframes settle {
+    from {
+      transform: scale(1.12);
+    }
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.25;
+    }
+  }
+
+  .work,
+  .stack {
+    padding-top: var(--space-16);
+  }
+
+  .projects {
+    margin-top: var(--space-6);
+    border-top: 1px solid var(--color-line);
+  }
+
+  .project {
+    display: grid;
+    grid-template-columns: 3rem 4.5rem 1fr 2rem;
+    align-items: start;
+    gap: var(--space-6);
+    padding-block: var(--space-12);
+    border-bottom: 1px solid var(--color-line);
+    transition: background var(--dur-base);
+  }
+
+  .project:hover {
+    background: var(--color-surface);
+  }
+
+  .index {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--color-text-faint);
+    padding-top: 0.4rem;
+  }
+
+  .glyph svg {
+    width: 4.5rem;
+    height: 4.5rem;
+    fill: none;
+    stroke: var(--color-text-muted);
+    stroke-width: 1;
+    transition: transform var(--dur-slow) var(--ease-out), stroke var(--dur-base);
+  }
+
+  .glyph .bit {
+    fill: var(--color-text-muted);
+    stroke: none;
+  }
+
+  .project:hover .glyph svg {
+    stroke: var(--color-text);
+  }
+
+  .project:hover .glyph svg:has(circle) {
+    transform: rotate(60deg);
+  }
+
+  .project:hover .glyph svg:has(.bit) {
+    transform: scale(1.06);
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+  }
+
+  .title {
+    font-size: var(--text-2xl);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: var(--leading-tight);
+  }
+
+  .summary {
+    max-width: 52ch;
+    color: var(--color-text-muted);
+  }
+
+  .body .tags {
+    margin-top: var(--space-2);
+  }
+
+  .arrow {
+    font-size: var(--text-xl);
+    color: var(--color-text-faint);
+    transition: transform var(--dur-base) var(--ease-out), color var(--dur-base);
+  }
+
+  .project:hover .arrow {
+    color: var(--color-text);
+    transform: translateX(6px);
+  }
+
+  .groups {
+    margin: var(--space-6) 0 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .group {
+    display: grid;
+    grid-template-columns: 10rem 1fr;
+    gap: var(--space-6);
+    padding-block: var(--space-4);
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  dt {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--color-text-faint);
+  }
+
+  dd {
+    margin: 0;
+  }
+
+  @media (max-width: 720px) {
+    .project {
+      grid-template-columns: 3.5rem 1fr;
+      gap: var(--space-4);
+      padding-block: var(--space-8);
+    }
+    .index,
+    .arrow {
+      display: none;
+    }
+    .glyph svg {
+      width: 3.5rem;
+      height: 3.5rem;
+    }
+    .group {
+      grid-template-columns: 1fr;
+      gap: var(--space-1);
+    }
+  }
+</style>
+
+<script>
+  // Warm the scene chunk (and Three.js) on hover so the project intro starts immediately.
+  const scenes: Record<string, () => Promise<unknown>> = {
+    "tbm-simulator": () => import("../scenes/cutterhead"),
+    "erc20-contracts": () => import("../scenes/hashgrid"),
+  };
+  for (const link of document.querySelectorAll<HTMLAnchorElement>("a.project")) {
+    const warm = scenes[link.pathname.split("/").pop() ?? ""];
+    if (!warm) continue;
+    const once = () => warm().catch(() => {});
+    link.addEventListener("pointerenter", once, { once: true });
+    link.addEventListener("focus", once, { once: true });
+  }
+</script>

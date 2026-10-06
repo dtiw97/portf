@@ -1,0 +1,83 @@
+---
+import Project from "../../layouts/Project.astro";
+import Flow from "../../components/Flow.astro";
+import { projects } from "../../data/site";
+
+const project = projects.find((p) => p.slug === "tbm-simulator")!;
+---
+
+<Project project={project} scene="cutterhead" caption="EPB cutterhead · 1.6 rpm">
+  <section>
+    <h2>Overview</h2>
+    <div>
+      <p>
+        A training replica of an <strong>Earth Pressure Balance tunnel boring machine</strong>.
+        Operators drive the cutterhead, screw conveyor, shield and navigation, and the machine
+        responds the way a real one would. Advance speed and face pressure shift as the
+        ground profile changes.
+      </p>
+      <p>
+        The goal is safety. Crews rehearse abnormal conditions in a simulator before they meet
+        them underground.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture</h2>
+    <div>
+      <p>
+        A Go service owns the simulation. Operator input arrives from the browser over
+        WebSocket. The service steps the physics, writes the resulting machine state to <strong>OPC UA</strong> nodes,
+        and streams the same state back to every connected client.
+      </p>
+      <Flow
+        label="Data flow from browser to OPC UA"
+        steps={[
+          { label: "React", note: "HMI, 3D, analytics" },
+          { label: "WebSocket", note: "Controls in, state out" },
+          { label: "Go · Gin", note: "Physics, events, state" },
+          { label: "OPC UA", note: "Node writes" },
+        ]}
+      />
+      <p style="margin-top: var(--space-6)">
+        Sessions and telemetry are persisted in <strong>PostgreSQL</strong>. If the database
+        connection fails, the service falls back to a local <strong>SQLite</strong> store, so a
+        training session keeps running and recording.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Simulation core</h2>
+    <div>
+      <p>
+        <strong>Physics.</strong> The model covers TBM behaviour (thrust, torque, face pressure
+        and advance rate) and responds to ground conditions along the alignment.
+      </p>
+      <p>
+        <strong>Event curation.</strong> Trainers script and inject events into a running
+        session, so each scenario is repeatable and can be assessed.
+      </p>
+      <p>
+        <strong>Machine state.</strong> An explicit state machine governs what the TBM can do at
+        any moment and keeps the simulation consistent with the controls.
+      </p>
+      <p>
+        <strong>Room management.</strong> Each room runs its own simulation, and trainees and
+        trainers join it over WebSocket.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Visualisation</h2>
+    <div>
+      <p>
+        Machine scenes are modelled in <strong>Blender</strong> and rendered in the browser with <strong>Three.js</strong>.
+        Process data such as pressures, torque and advance is charted
+        live with <strong>D3.js</strong> for operators and in review for trainers.
+      </p>
+    </div>
+  </section>
+</Project>

@@ -1,0 +1,215 @@
+---
+/*
+ * 张 calligraphy loader, written in running script (行书).
+ *
+ * The ink is a traced reference character (src/assets/zhang/reference.png), so the
+ * ragged edges and dry-brush flecks are real brushwork. It is revealed through a time map
+ * built by scripts/build-zhang.ts: each pixel stores when the brush reaches it, paced the way a hand
+ * writes (press on landing, sweep, stop at turns, flick out of hooks, lift between strokes).
+ * Thresholding that map over 3s writes the character in stroke order.
+ *
+ * Then the view dives into solid ink at the centre until it fills the screen, and cuts to
+ * the black landing page.
+ */
+import zhang from "../assets/zhang/zhang.json";
+import { site } from "../data/site";
+
+const HOLD = 400; // a breath on the finished character
+const ZOOM_DUR = 1200;
+const FRONT = 400; // sharpness of the brush front: ~7ms of travel, i.e. a hard ink edge
+
+const timing = JSON.stringify({
+  draw: zhang.drawEnd,
+  zoomStart: zhang.drawEnd + HOLD,
+  zoomDur: ZOOM_DUR,
+  front: FRONT,
+  fx: zhang.target.x / zhang.width,
+  fy: zhang.target.y / zhang.height,
+  r: (zhang.target.r - 4) / zhang.width,
+});
+const { width: W, height: H } = zhang;
+---
+
+<script is:inline>
+  // Runs before first paint. Plays on every fresh load or reload of the home page,
+  // but not when returning to it from another page of this site.
+  try {
+    const root = document.documentElement;
+    root.dataset.js = "";
+    const nav = performance.getEntriesByType("navigation")[0];
+    const internal = document.referrer && new URL(document.referrer).origin === location.origin;
+    if (internal && nav && nav.type !== "reload") root.dataset.skipLoader = "";
+    else root.dataset.loading = "";
+  } catch {}
+</script>
+
+<div class="loader" aria-hidden="true" data-timing={timing}>
+  <div class="stage" style={`aspect-ratio:${W}/${H}`}>
+    <svg viewBox={`0 0 ${W} ${H}`}>
+      <defs>
+        <filter id="brush" filterUnits="userSpaceOnUse" x="0" y="0" width={W} height={H} color-interpolation-filters="sRGB">
+          <!-- Ink settling into the paper -->
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="bleed"></feGaussianBlur>
+          <feComponentTransfer in="bleed" result="halo">
+            <feFuncA type="linear" slope="0.4"></feFuncA>
+          </feComponentTransfer>
+          <feMerge>
+            <feMergeNode in="halo"></feMergeNode>
+            <feMergeNode in="SourceGraphic"></feMergeNode>
+          </feMerge>
+        </filter>
+        <!-- Reveal: white where the brush has already passed. out = front × (progress − arrival) -->
+        <filter id="reveal-front" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
+          <feComponentTransfer>
+            <feFuncR class="front" type="linear" slope={-FRONT} intercept="0"></feFuncR>
+            <feFuncG class="front" type="linear" slope={-FRONT} intercept="0"></feFuncG>
+            <feFuncB class="front" type="linear" slope={-FRONT} intercept="0"></feFuncB>
+          </feComponentTransfer>
+        </filter>
+        <mask id="reveal" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
+          <image href={zhang.timeMap} width={W} height={H} preserveAspectRatio="none" filter="url(#reveal-front)"></image>
+        </mask>
+      </defs>
+      <g filter="url(#brush)">
+        <path class="ink" d={zhang.d} mask="url(#reveal)"></path>
+      </g>
+    </svg>
+  </div>
+
+  <p class="meta">{site.name}</p>
+</div>
+
+<script>
+  type Timing = {
+    draw: number;
+    zoomStart: number;
+    zoomDur: number;
+    front: number;
+    fx: number;
+    fy: number;
+    r: number;
+  };
+
+  const root = document.documentElement;
+  const loader = document.querySelector<HTMLElement>(".loader");
+  const stage = loader?.querySelector<HTMLElement>(".stage");
+
+  if (loader && stage && !root.hasAttribute("data-skip-loader")) {
+    const timing: Timing = JSON.parse(loader.dataset.timing!);
+    const fronts = [...loader.querySelectorAll<SVGElement>(".front")];
+    const end = 1 + 1 / timing.front;
+    let raf = 0;
+    let timer = 0;
+
+    const finish = () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      root.dataset.skipLoader = "";
+      delete root.dataset.loading;
+      loader.remove();
+    };
+
+    // Writing: sweep the reveal threshold through the time map.
+    const origin = performance.now();
+    const write = (now: number) => {
+      const progress = Math.min(end, (now - origin) / timing.draw);
+      const intercept = String(timing.front * progress);
+      for (const f of fronts) f.setAttribute("intercept", intercept);
+      if (progress < end) raf = requestAnimationFrame(write);
+    };
+    raf = requestAnimationFrame(write);
+
+    /** Dives into the centre ink: scale grows exponentially while the target slides to centre. */
+    const dive = () => {
+      const box = stage.getBoundingClientRect();
+      const px = box.left + timing.fx * box.width;
+      const py = box.top + timing.fy * box.height;
+      const solidPx = timing.r * box.width;
+      const halfDiagonal = Math.hypot(innerWidth, innerHeight) / 2;
+      const scale = (halfDiagonal / solidPx) * 1.1;
+      const dx = innerWidth / 2 - px;
+      const dy = innerHeight / 2 - py;
+
+      const easeIn = (t: number) => t * t * (3 - 2 * t) * 0.35 + t * t * t * 0.65;
+      const frames = Array.from({ length: 25 }, (_, i) => {
+        const e = easeIn(i / 24);
+        return { transform: `translate(${dx * e}px, ${dy * e}px) scale(${Math.pow(scale, e)})` };
+      });
+
+      loader.classList.add("diving");
+      stage.style.transformOrigin = `${timing.fx * 100}% ${timing.fy * 100}%`;
+      stage.animate(frames, { duration: timing.zoomDur, fill: "forwards" }).finished.then(finish, finish);
+    };
+    timer = window.setTimeout(dive, timing.zoomStart);
+
+    loader.addEventListener("pointerdown", finish, { once: true });
+    addEventListener("keydown", finish, { once: true });
+  } else {
+    loader?.remove();
+  }
+</script>
+
+<style>
+  .loader {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    cursor: pointer;
+    background-color: var(--paper);
+    /* Xuan paper grain */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.38 0 0 0 0 0.3 0 0 0 0.11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  :global(html[data-skip-loader]) .loader {
+    display: none;
+  }
+
+  /* Landing content waits, unplayed, until the loader hands over. */
+  :global(html[data-loading] .rise),
+  :global(html[data-loading] .hero) {
+    animation-play-state: paused;
+  }
+
+  /* Without JS there is no writing or dive; skip straight to the page. */
+  :global(html:not([data-js])) .loader {
+    display: none;
+  }
+
+  .stage {
+    position: relative;
+    width: min(84vmin, 760px);
+    will-change: transform;
+  }
+
+  .stage > svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .ink {
+    fill: #0b0a09;
+    fill-rule: evenodd; /* the trace's inner contours are paper showing through: dry-brush flecks */
+  }
+
+  .meta {
+    position: absolute;
+    inset-inline: 0;
+    bottom: var(--space-6);
+    margin: 0;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-5);
+    transition: transform 500ms var(--ease-in-out);
+  }
+
+  .diving .meta {
+    transform: translateY(calc(100% + var(--space-12)));
+  }
+</style>

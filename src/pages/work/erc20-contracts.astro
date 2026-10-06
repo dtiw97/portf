@@ -1,0 +1,64 @@
+---
+import Project from "../../layouts/Project.astro";
+import Flow from "../../components/Flow.astro";
+import { projects } from "../../data/site";
+import { TRANSFER_SIGNATURE, TRANSFER_TOPIC } from "../../lib/erc20";
+
+const project = projects.find((p) => p.slug === "erc20-contracts")!;
+---
+
+<Project project={project} scene="hashgrid" caption="keccak256 · 256 bits">
+  <section>
+    <h2>Overview</h2>
+    <div>
+      <p>
+        A Web3 application built on <strong>Solidity</strong> smart contracts. Execution is
+        split between functions the world can call and functions only the contract can reach,
+        and value moves as <strong>ERC-20</strong> token transfers.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Contract design</h2>
+    <div>
+      <p>
+        <strong>Public surface.</strong> The <code>public</code> and <code>external</code> functions
+        are the contract's API. They validate the caller and inputs, then hand off.
+      </p>
+      <p>
+        <strong>Private execution.</strong> State changes live in <code>internal</code> and <code>private</code> functions,
+        which can't be invoked directly. That keeps every mutation behind a checked entry point.
+      </p>
+      <Flow
+        label="Execution path of a call"
+        steps={[
+          { label: "Caller", note: "Wallet or dApp" },
+          { label: "external", note: "Checks & guards" },
+          { label: "private", note: "State transition" },
+          { label: "ERC-20", note: "transfer / transferFrom" },
+          { label: "Event", note: "Transfer log" },
+        ]}
+      />
+    </div>
+  </section>
+
+  <section>
+    <h2>The grid</h2>
+    <div>
+      <p>
+        The 16×16 square above is 256 bits. It settles on <code>keccak256("{TRANSFER_SIGNATURE}")</code>,
+        the topic every ERC-20 <code>Transfer</code> event is logged under:
+      </p>
+      <p class="hash"><code>0x{TRANSFER_TOPIC}</code></p>
+    </div>
+  </section>
+</Project>
+
+<style>
+  .hash {
+    margin-top: var(--space-4);
+    overflow-wrap: anywhere;
+    font-size: var(--text-sm);
+  }
+</style>

@@ -1,0 +1,265 @@
+---
+import Base from "./Base.astro";
+import type { Project } from "../data/site";
+import { site } from "../data/site";
+import { INTRO_MS } from "../lib/motion";
+
+interface Props {
+  project: Project;
+  scene: "cutterhead" | "hashgrid";
+  caption: string;
+}
+
+const { project, scene, caption } = Astro.props;
+---
+
+<Base title={`${project.title} — ${site.name}`} description={project.summary}>
+  <Fragment slot="before">
+    <script is:inline define:vars={{ timeout: INTRO_MS + 2500 }}>
+      // Hide content before first paint; the scene reveals it. Safety net if WebGL never starts.
+      const root = document.documentElement;
+      root.dataset.intro = "playing";
+      setTimeout(() => (root.dataset.intro = "done"), timeout);
+    </script>
+    <canvas class="scene" data-scene={scene} aria-hidden="true"></canvas>
+    <p class="caption" aria-hidden="true">{caption}</p>
+  </Fragment>
+
+  <article class="case">
+    <header class="case-head">
+      <div class="wrap head-inner">
+        <a class="back rise" href="/#work">← All work</a>
+        <p class="eyebrow rise" style="--d:80ms">{project.index} · {project.kicker}</p>
+        <h1 class="rise" style="--d:160ms">{project.title}</h1>
+        <p class="summary rise" style="--d:240ms">{project.summary}</p>
+        <div class="tags rise" style="--d:320ms">
+          {project.tags.map((t) => <span class="tag">{t}</span>)}
+        </div>
+      </div>
+    </header>
+    <div class="case-body">
+      <div class="wrap">
+        <slot />
+      </div>
+    </div>
+  </article>
+</Base>
+
+<script>
+  import { INTRO_MS, prefersReducedMotion } from "../lib/motion";
+  import type { Mounted } from "../scenes/stage";
+
+  const root = document.documentElement;
+  const done = () => (root.dataset.intro = "done");
+  const canvas = document.querySelector<HTMLCanvasElement>("canvas.scene")!;
+
+  const scenes = {
+    cutterhead: () => import("../scenes/cutterhead"),
+    hashgrid: () => import("../scenes/hashgrid"),
+  };
+
+  async function boot() {
+    const load = scenes[canvas.dataset.scene as keyof typeof scenes];
+    const { mount } = await load();
+    const mounted: Mounted = mount(canvas, {
+      introMs: INTRO_MS,
+      gentle: prefersReducedMotion(),
+      onIntroEnd: done,
+    });
+
+    const skip = () => {
+      if (root.dataset.intro === "playing") mounted.skip();
+    };
+    canvas.addEventListener("pointerdown", skip);
+    addEventListener("keydown", skip, { once: true });
+    addEventListener("pagehide", () => mounted.dispose(), { once: true });
+  }
+
+  boot().catch(() => {
+    // No WebGL (or the chunk failed): show the content without a scene.
+    canvas.remove();
+    done();
+  });
+</script>
+
+<style>
+  .scene {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  .caption {
+    position: fixed;
+    left: var(--gutter);
+    bottom: var(--space-6);
+    z-index: 1;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+    pointer-events: none;
+    transition: opacity var(--dur-slow);
+  }
+
+  :global(html[data-intro="playing"]) .caption {
+    color: var(--color-text-muted);
+  }
+
+  /*
+   * Hand-over from the intro scene, in the same language as the home page after the loader:
+   * the title block rises line by line (.rise, held until the scene ends), then the chrome
+   * and the case body fade and settle in behind it.
+   */
+  :global(html[data-intro="playing"] .rise) {
+    animation-play-state: paused;
+  }
+
+  :global(html[data-intro="playing"] .header),
+  :global(html[data-intro="playing"] .footer),
+  :global(html[data-intro="playing"]) .case-body {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  :global(html[data-intro="playing"]) .case-body {
+    transform: translateY(var(--space-8));
+  }
+
+  :global(html[data-intro="playing"]) .head-inner > * {
+    pointer-events: none;
+  }
+
+  :global(.header),
+  :global(.footer) {
+    transition: opacity var(--dur-slow) var(--ease-out) 240ms;
+  }
+
+  .case-body {
+    transition:
+      opacity var(--dur-slow) var(--ease-out) 400ms,
+      transform var(--dur-slow) var(--ease-out) 400ms;
+  }
+
+  :global(html[data-intro] .footer) {
+    position: relative;
+    z-index: 1;
+    background: var(--color-bg);
+    margin-top: 0;
+  }
+
+  .case {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Scrim keeps the title legible over the scene: from the left on wide screens, from below on narrow. */
+  .case-head {
+    background: linear-gradient(90deg, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0.4) 40%, transparent 65%);
+    pointer-events: none;
+  }
+
+  .head-inner {
+    min-height: calc(100svh - 4.5rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--space-4);
+    padding-bottom: var(--space-16);
+  }
+
+  .head-inner > * {
+    pointer-events: auto;
+  }
+
+  @media (max-width: 899px) {
+    .case-head {
+      background: linear-gradient(transparent 40%, rgb(0 0 0 / 0.85) 72%);
+    }
+  }
+
+  .back {
+    align-self: flex-start;
+    margin-bottom: auto;
+    padding-top: var(--space-8);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .back:hover {
+    color: var(--color-text);
+  }
+
+  h1 {
+    font-size: var(--text-display);
+    font-weight: 600;
+    line-height: 0.92;
+    letter-spacing: -0.045em;
+    text-shadow: 0 0 40px #000;
+  }
+
+  .summary {
+    max-width: 46ch;
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    text-shadow: 0 0 24px #000;
+  }
+
+  .case-body {
+    background: linear-gradient(transparent, var(--color-bg) 10rem);
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-24);
+  }
+
+  /* Shared building blocks for case-study content passed through the slot. */
+  .case-body :global(section) {
+    display: grid;
+    grid-template-columns: 14rem 1fr;
+    gap: var(--space-8);
+    padding-block: var(--space-12);
+    border-top: 1px solid var(--color-line);
+  }
+
+  .case-body :global(section > h2) {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    padding-top: 0.35rem;
+  }
+
+  .case-body :global(section p) {
+    max-width: var(--measure);
+    color: var(--color-text-muted);
+  }
+
+  .case-body :global(section p + p) {
+    margin-top: var(--space-4);
+  }
+
+  .case-body :global(strong) {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .case-body :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--color-text);
+  }
+
+  @media (max-width: 720px) {
+    .case-body :global(section) {
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+    }
+  }
+</style>
