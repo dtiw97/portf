@@ -79,10 +79,11 @@ export function createStage(canvas: HTMLCanvasElement, fov = 35) {
     raf = requestAnimationFrame(tick);
   };
 
+  let paused = false;
   const onVisibility = () => {
     cancelAnimationFrame(raf);
     last = 0;
-    if (!document.hidden) raf = requestAnimationFrame(tick);
+    if (!document.hidden && !paused) raf = requestAnimationFrame(tick);
   };
   document.addEventListener("visibilitychange", onVisibility);
 
@@ -99,6 +100,12 @@ export function createStage(canvas: HTMLCanvasElement, fov = 35) {
       if (k === shift) return;
       shift = k;
       applyShift();
+    },
+    /** Stops rendering (and the timeline) while the canvas is out of view. */
+    setPaused(p: boolean) {
+      if (p === paused) return;
+      paused = p;
+      onVisibility();
     },
     seek(ms: number) {
       elapsed = Math.max(elapsed, ms);

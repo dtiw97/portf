@@ -8,6 +8,7 @@ import { projects, stack } from "../data/site";
   <Loader slot="before" />
 
   <section class="hero wrap">
+    <canvas class="tourbillon" aria-hidden="true"></canvas>
     <p class="eyebrow rise">Software engineer · React & Go</p>
     <h1 class="display rise" style="--d:80ms">
       David<br />Tiw Minjie
@@ -99,6 +100,7 @@ import { projects, stack } from "../data/site";
 <style>
   /* Carries the loader's dive: the hero arrives slightly over-zoomed and settles. */
   .hero {
+    position: relative;
     animation: settle 1400ms var(--ease-out) both;
     transform-origin: 30% 50%;
     min-height: calc(100svh - 4.5rem);
@@ -107,6 +109,28 @@ import { projects, stack } from "../data/site";
     justify-content: center;
     gap: var(--space-6);
     padding-block: var(--space-16);
+  }
+
+  /* Full-bleed behind the hero text; the watch sits to the right (above on narrow screens). */
+  .hero > :not(.tourbillon) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .tourbillon {
+    position: absolute;
+    top: 0;
+    left: calc(50% - 50vw);
+    width: 100vw;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  @media (max-width: 899px) {
+    .tourbillon {
+      opacity: 0.4;
+    }
   }
 
   .display {
@@ -300,6 +324,38 @@ import { projects, stack } from "../data/site";
 </style>
 
 <script>
+  import { prefersReducedMotion } from "../lib/motion";
+
+  // The tourbillon assembles once the hero's words have risen: 2s after the loader hands over.
+  const ASSEMBLE_AFTER = 2000;
+  const root = document.documentElement;
+  const watchCanvas = document.querySelector<HTMLCanvasElement>("canvas.tourbillon");
+
+  function whenLanded(go: () => void) {
+    if (!root.hasAttribute("data-loading")) return go();
+    const watch = new MutationObserver(() => {
+      if (root.hasAttribute("data-loading")) return;
+      watch.disconnect();
+      go();
+    });
+    watch.observe(root, { attributes: true, attributeFilter: ["data-loading"] });
+  }
+
+  if (watchCanvas) {
+    const scene = import("../scenes/tourbillon"); // fetch while the loader plays
+    whenLanded(() =>
+      setTimeout(async () => {
+        try {
+          const { mount } = await scene;
+          const mounted = mount(watchCanvas, { gentle: prefersReducedMotion() });
+          addEventListener("pagehide", () => mounted.dispose(), { once: true });
+        } catch {
+          watchCanvas.remove(); // no WebGL: the hero stands on its own
+        }
+      }, ASSEMBLE_AFTER),
+    );
+  }
+
   // Warm the scene chunk (and Three.js) on hover so the project intro starts immediately.
   const scenes: Record<string, () => Promise<unknown>> = {
     "tbm-simulator": () => import("../scenes/cutterhead"),
