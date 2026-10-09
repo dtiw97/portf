@@ -1,7 +1,5 @@
 import {
   BufferGeometry,
-  CanvasTexture,
-  Color,
   EdgesGeometry,
   ExtrudeGeometry,
   Float32BufferAttribute,
@@ -10,34 +8,28 @@ import {
   LineSegments,
   Matrix4,
   Path,
-  Points,
   Shape,
-  ShaderMaterial,
   Vector2,
-  Vector3,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { clamp01, easeInOutCubic, easeOutCubic } from "../lib/motion";
 import { createStage } from "./stage";
 
 /*
- * A tourbillon movement assembling itself, part by part, from an exploded view.
- *
- * Each part arrives as data first: streams of 0s and 1s converge onto the part's outline,
- * resolve into its wireframe drawing, and only then does the part drop into its place in
- * the movement. Once the last part (the case) is in, the movement runs: the cage turns,
- * the balance swings and the escape wheel ticks.
+ * A tourbillon wristwatch assembling itself, part by part, from an exploded view: the
+ * movement first, then the case, bezel, chapter ring, hands, crystal and straps. Each part
+ * fades in as a wireframe above its place and drops in. Once the watch is whole it runs:
+ * the hands show the viewer's local time, the cage turns, the balance swings and the
+ * escape wheel ticks.
  *
  * Units: the case is radius ~1, the dial plane is XY and Z rises off the mainplate.
  */
 
 // --- Timeline (ms) ---------------------------------------------------------------------
 
-const STAGGER = 520; // between parts starting
-const TRAVEL = 700; // one bit's flight
-const ARRIVE = [700, 1500]; // first and last bit landing on the outline
-const RESOLVE = [1300, 1900]; // bits give way to the drawing
-const ASSEMBLE = [1900, 2900]; // the drawing drops into place
+const STAGGER = 300; // between parts starting
+const APPEAR = [0, 450]; // the wireframe fades in above its place
+const ASSEMBLE = [200, 1100]; // and drops into it
 const LIFT = 0.8; // exploded-view height a part forms at
 
 const DISTANCE = 5.6; // camera to movement, on landscape screens
@@ -185,6 +177,8 @@ type PartDef = {
   /** Pivot of the part on the mainplate (for cage parts: relative to the cage centre). */
   at: Vector2;
   inCage?: boolean;
+  /** Built off-centre (bridges, straps): drops straight rather than spinning round the centre. */
+  straight?: boolean;
   build: () => BufferGeometry;
 };
 
@@ -222,6 +216,7 @@ const PARTS: PartDef[] = [
   {
     name: "train bridge",
     at: v2(0, 0),
+    straight: true,
     build: () => {
       const d = THIRD.clone().sub(CENTER).normalize().multiplyScalar(0.08);
       return solid(bridge(CENTER.clone().sub(d), THIRD.clone().add(d), 0.04), 0.03, 0.08);
@@ -291,6 +286,7 @@ const PARTS: PartDef[] = [
   {
     name: "tourbillon bridge",
     at: v2(0, 0),
+    straight: true,
     build: () => {
       const dir = polar(1, 0.35);
       const p0 = CAGE.clone().sub(dir.clone().multiplyScalar(0.55));
@@ -301,191 +297,177 @@ const PARTS: PartDef[] = [
   {
     name: "case",
     at: v2(0, 0),
+    straight: true,
     build: () => {
       const ring = circle(1.08, v2(0, 0), true) as Shape;
       ring.holes.push(circle(1.0));
-      const ticks: number[] = [];
-      for (let k = 0; k < 60; k++) {
-        const a = (k * TAU) / 60;
-        const p0 = polar(1.012, a);
-        const p1 = polar(k % 5 ? 1.035 : 1.06, a);
-        ticks.push(p0.x, p0.y, 0.14, p1.x, p1.y, 0.14);
-      }
       const crown = solid(gearOutline(0.06, 18, 0.01), 0.09, 0).applyMatrix4(
         new Matrix4().makeRotationY(Math.PI / 2).premultiply(new Matrix4().makeTranslation(1.07, 0, 0.035)),
       );
-      return merge(solid(ring, 0.22, -0.08), lines(ticks), crown);
+      // Four lugs, at twelve and six, each with the spring bar the strap hangs on.
+      const lug = new Shape();
+      lug.moveTo(0.36, 0.96).lineTo(0.47, 0.96).lineTo(0.47, 1.3);
+      lug.absarc(0.415, 1.3, 0.055, 0, Math.PI, false);
+      lug.lineTo(0.36, 0.96);
+      const lugs = [1, -1].flatMap((sy) =>
+        [1, -1].map((sx) => solid(lug, 0.16, -0.06).applyMatrix4(new Matrix4().makeScale(sx, sy, 1))),
+      );
+      const bars = lines([-0.36, 1.3, 0.02, 0.36, 1.3, 0.02, -0.36, -1.3, 0.02, 0.36, -1.3, 0.02]);
+      return merge(solid(ring, 0.22, -0.08), crown, ...lugs, bars);
+    },
+  },
+  {
+    name: "bezel",
+    at: v2(0, 0),
+    build: () => {
+      const ring = circle(1.1, v2(0, 0), true) as Shape;
+      ring.holes.push(circle(0.99));
+      const ticks: number[] = [];
+      for (let k = 0; k < 60; k++) {
+        const a = (k * TAU) / 60;
+        const p0 = polar(1.0, a);
+        const p1 = polar(k % 5 ? 1.03 : 1.065, a);
+        ticks.push(p0.x, p0.y, 0.26, p1.x, p1.y, 0.26);
+      }
+      return merge(solid(ring, 0.12, 0.14), lines(ticks));
+    },
+  },
+  {
+    name: "chapter ring",
+    at: v2(0, 0),
+    build: () => {
+      const ring = circle(0.97, v2(0, 0), true) as Shape;
+      ring.holes.push(circle(0.84));
+      const parts = [solid(ring, 0.015, 0.225)];
+      const ticks: number[] = [];
+      for (let k = 0; k < 60; k++) {
+        if (k % 5 === 0) continue;
+        const a = (k * TAU) / 60;
+        const p0 = polar(0.93, a);
+        const p1 = polar(0.955, a);
+        ticks.push(p0.x, p0.y, 0.24, p1.x, p1.y, 0.24);
+      }
+      // Hour batons, except at six where the tourbillon shows through.
+      const baton = new Shape([v2(-0.016, 0.855), v2(0.016, 0.855), v2(0.016, 0.955), v2(-0.016, 0.955)]);
+      for (let h = 0; h < 12; h++) {
+        if (h === 6) continue;
+        parts.push(solid(baton, 0.012, 0.24).applyMatrix4(new Matrix4().makeRotationZ((-h * TAU) / 12)));
+      }
+      return merge(...parts, lines(ticks));
+    },
+  },
+  {
+    name: "hour hand",
+    at: v2(0, 0),
+    build: () => {
+      const s = new Shape([v2(-0.025, -0.09), v2(0.025, -0.09), v2(0.038, 0.22), v2(0, 0.5), v2(-0.038, 0.22)]);
+      s.holes.push(circle(0.012));
+      return solid(s, 0.01, 0.27);
+    },
+  },
+  {
+    name: "minute hand",
+    at: v2(0, 0),
+    build: () => {
+      const s = new Shape([v2(-0.018, -0.11), v2(0.018, -0.11), v2(0.026, 0.32), v2(0, 0.8), v2(-0.026, 0.32)]);
+      s.holes.push(circle(0.012));
+      return solid(s, 0.01, 0.285);
+    },
+  },
+  {
+    name: "seconds hand",
+    at: v2(0, 0),
+    build: () => {
+      const needle = new Shape([v2(-0.006, -0.2), v2(0.006, -0.2), v2(0.003, 0.9), v2(-0.003, 0.9)]);
+      const weight = circle(0.032, v2(0, -0.17), true) as Shape;
+      const cap = circle(0.03, v2(0, 0), true) as Shape;
+      return merge(solid(needle, 0.008, 0.3), solid(weight, 0.008, 0.3), solid(cap, 0.02, 0.3));
+    },
+  },
+  {
+    name: "crystal",
+    at: v2(0, 0),
+    build: () => {
+      // A domed sapphire: its rim and two contour rings rising to the dome.
+      const rings: number[] = [];
+      for (const [r, z] of [[0.99, 0.27], [0.8, 0.34], [0.45, 0.375]]) {
+        const n = 96;
+        for (let k = 0; k < n; k++) {
+          const a = polar(r, (k * TAU) / n);
+          const b = polar(r, ((k + 1) * TAU) / n);
+          rings.push(a.x, a.y, z, b.x, b.y, z);
+        }
+      }
+      return lines(rings);
+    },
+  },
+  {
+    name: "straps",
+    at: v2(0, 0),
+    straight: true,
+    build: () => {
+      // Each strap runs from the spring bar and curves away under the wrist.
+      const side = (x0: number, x1: number, n: number) =>
+        Array.from({ length: n + 1 }, (_, i) => v2(x0 + ((x1 - x0) * i) / n, 1.22 + (1.3 * i) / n));
+      const left = side(-0.355, -0.3, 16);
+      const right = side(0.355, 0.3, 16);
+      const strap = new Shape([...right, ...left.reverse()]);
+      const stitches: number[] = [];
+      for (const sx of [-1, 1]) {
+        for (let i = 0; i < 24; i += 2) {
+          const y0 = 1.3 + (1.15 * i) / 24;
+          const y1 = 1.3 + (1.15 * (i + 1)) / 24;
+          const x = (y: number) => sx * (0.325 - ((y - 1.22) / 1.3) * 0.055);
+          stitches.push(x(y0), y0, 0.045, x(y1), y1, 0.045);
+        }
+      }
+      const one = merge(solid(strap, 0.05, -0.01), lines(stitches));
+      const bend = (g: BufferGeometry) => {
+        const p = g.getAttribute("position");
+        for (let i = 0; i < p.count; i++) {
+          const over = Math.max(0, Math.abs(p.getY(i)) - 1.55);
+          p.setZ(i, p.getZ(i) - over * over * 0.45);
+        }
+        return g;
+      };
+      const top = bend(one.clone());
+      const bottom = bend(one.applyMatrix4(new Matrix4().makeScale(1, -1, 1)));
+      return merge(top, bottom);
     },
   },
 ];
-
-// --- Bits ---------------------------------------------------------------------------------
-
-const TRAILS = 4; // a head digit and three behind it: streams read as 0110…
-const SPACING = 0.016;
-const MAX_BITS = 700;
-
-function glyphAtlas() {
-  const c = document.createElement("canvas");
-  c.width = 128;
-  c.height = 64;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#fff";
-  g.font = "600 50px ui-monospace, Menlo, Consolas, monospace";
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText("0", 32, 34);
-  g.fillText("1", 96, 34);
-  return new CanvasTexture(c);
-}
-
-const bitVertex = /* glsl */ `
-  uniform float uTime;
-  uniform float uFade;
-  uniform float uSize;
-  attribute vec3 aStart;
-  attribute float aArrive;
-  attribute float aSeed;
-  attribute float aTrail;
-  varying float vAlpha;
-  varying float vGlyph;
-  varying float vTone;
-
-  void main() {
-    float depart = aArrive - ${TRAVEL.toFixed(1)} - aTrail * 45.0;
-    float t = clamp((uTime - depart) / ${TRAVEL.toFixed(1)}, 0.0, 1.0);
-    vec3 p = mix(aStart, position, 1.0 - pow(1.0 - t, 3.0));
-
-    // Trailing digits fold into the head as it lands.
-    float trail = aTrail > 0.5 ? (1.0 - smoothstep(0.8, 1.0, t)) * (1.0 - aTrail * 0.2) : 1.0;
-    vAlpha = step(0.0001, t) * trail * (1.0 - uFade);
-
-    float tick = floor(uTime / 70.0 + aSeed * 13.0);
-    vGlyph = step(0.5, fract(sin(aSeed * 78.233 + tick * 12.9898) * 43758.5453));
-    vTone = aTrail < 0.5 ? (aSeed > 0.94 ? 2.0 : 1.0) : 0.0; // tail, head, accent head
-
-    vec4 mv = modelViewMatrix * vec4(p, 1.0);
-    gl_PointSize = uSize / -mv.z;
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const bitFragment = /* glsl */ `
-  uniform sampler2D uAtlas;
-  uniform vec3 uTail;
-  uniform vec3 uHead;
-  uniform vec3 uAccent;
-  varying float vAlpha;
-  varying float vGlyph;
-  varying float vTone;
-
-  void main() {
-    vec2 uv = vec2((gl_PointCoord.x + vGlyph) * 0.5, 1.0 - gl_PointCoord.y);
-    float a = texture2D(uAtlas, uv).a * vAlpha;
-    if (a < 0.02) discard;
-    vec3 c = vTone > 1.5 ? uAccent : vTone > 0.5 ? uHead : uTail;
-    gl_FragColor = vec4(c, a);
-  }
-`;
-
-/** Bits that stream in and settle along the part's outline, in drawing order. */
-function bitsFor(outline: BufferGeometry, index: number, material: ShaderMaterial) {
-  const pos = outline.getAttribute("position");
-  const samples: Vector3[] = [];
-  const a = new Vector3();
-  const b = new Vector3();
-  for (let i = 0; i < pos.count; i += 2) {
-    a.fromBufferAttribute(pos, i);
-    b.fromBufferAttribute(pos, i + 1);
-    const n = Math.max(1, Math.round(a.distanceTo(b) / SPACING));
-    for (let k = 0; k < n; k++) samples.push(a.clone().lerp(b, (k + 0.5) / n));
-  }
-  const stride = Math.max(1, samples.length / MAX_BITS);
-  const picked: Vector3[] = [];
-  for (let f = 0; f < samples.length; f += stride) picked.push(samples[Math.floor(f)]);
-
-  // Streams pour in from the upper right, toward the viewer.
-  const dir = new Vector3(1, 0.9, 1.4).normalize();
-  const side = new Vector3(-0.9, 1, 0).normalize();
-  const target: number[] = [];
-  const start: number[] = [];
-  const arrive: number[] = [];
-  const seed: number[] = [];
-  const trail: number[] = [];
-  picked.forEach((p, i) => {
-    const r = (k: number) => rand(index * 100_003 + i * 7 + k);
-    const from = p
-      .clone()
-      .addScaledVector(dir, 2.2 + r(1) * 0.9)
-      .addScaledVector(side, (r(2) - 0.5) * 0.5);
-    const land = ARRIVE[0] + (ARRIVE[1] - ARRIVE[0]) * (i / picked.length) + r(3) * 120;
-    for (let t = 0; t < TRAILS; t++) {
-      target.push(p.x, p.y, p.z);
-      start.push(from.x, from.y, from.z);
-      arrive.push(land);
-      seed.push((r(4) + t * 0.37) % 1);
-      trail.push(t);
-    }
-  });
-
-  const g = new BufferGeometry();
-  g.setAttribute("position", new Float32BufferAttribute(target, 3));
-  g.setAttribute("aStart", new Float32BufferAttribute(start, 3));
-  g.setAttribute("aArrive", new Float32BufferAttribute(arrive, 1));
-  g.setAttribute("aSeed", new Float32BufferAttribute(seed, 1));
-  g.setAttribute("aTrail", new Float32BufferAttribute(trail, 1));
-  const points = new Points(g, material);
-  points.frustumCulled = false; // they start far outside the part's bounds
-  return points;
-}
 
 // --- Scene --------------------------------------------------------------------------------
 
 type Part = PartDef & {
   group: Group;
   line: LineBasicMaterial;
-  bits: Points;
-  bitMat: ShaderMaterial;
   spin: number; // rotation it forms at, unwound as it drops in
 };
 
+/** Hand angles for the viewer's local time; the seconds hand steps four times a second. */
+function handAngles(now: Date) {
+  const sec = now.getSeconds() + Math.floor(now.getMilliseconds() / 250) / 4;
+  const min = now.getMinutes() + sec / 60;
+  const hour = (now.getHours() % 12) + min / 60;
+  return { hour: (-hour / 12) * TAU, minute: (-min / 60) * TAU, second: (-sec / 60) * TAU };
+}
+
 export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }) {
   const stage = createStage(canvas, 30);
-  const { scene, camera, pointer, renderer } = stage;
+  const { scene, camera, pointer } = stage;
   stage.setShift(1);
   camera.position.set(0, 0, DISTANCE);
 
   const watch = new Group();
   scene.add(watch);
-  const atlas = glyphAtlas();
 
   const parts: Part[] = PARTS.map((def, i) => {
     const group = new Group();
-    const outline = def.build();
     const line = new LineBasicMaterial({ color: 0xededed, transparent: true, opacity: 0, depthWrite: false });
-    group.add(new LineSegments(outline, line));
-    const bitMat = new ShaderMaterial({
-      vertexShader: bitVertex,
-      fragmentShader: bitFragment,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      uniforms: {
-        uTime: { value: 0 },
-        uFade: { value: 0 },
-        uSize: { value: 11 * renderer.getPixelRatio() * DISTANCE },
-        uAtlas: { value: atlas },
-        uTail: { value: new Color(0x4a4a4a) },
-        uHead: { value: new Color(0xededed) },
-        uAccent: { value: new Color(0xc8312b) },
-      },
-    });
-    const bits = bitsFor(outline, i, bitMat);
-    group.add(bits);
+    group.add(new LineSegments(def.build(), line));
     watch.add(group);
-    // Parts built off-centre (the bridges) would swing round the watch's centre, so they drop straight.
-    const offCentre = def.name.endsWith("bridge") && def.at.length() === 0;
-    return { ...def, group, line, bits, bitMat, spin: offCentre ? 0 : (rand(i + 9) - 0.5) * 1.2 };
+    return { ...def, group, line, spin: def.straight ? 0 : (rand(i + 9) - 0.5) * 1.2 };
   });
 
   const total = (parts.length - 1) * STAGGER + ASSEMBLE[1];
@@ -495,7 +477,7 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
   const cagePivot = new Vector2();
 
   stage.start((t, dt) => {
-    // Running: everything ramps up once the case is on.
+    // Running: the movement ramps up once the watch is whole.
     const run = gentle ? 0 : easeInOutCubic(clamp01((t - total - 300) / 1500));
     const s = t / 1000;
     cage += run * (dt / CAGE_PERIOD) * TAU;
@@ -513,16 +495,17 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
       balance,
       hairspring: balance * 0.35,
     };
+    const time = handAngles(new Date());
+    own["hour hand"] = time.hour;
+    own["minute hand"] = time.minute;
+    own["seconds hand"] = time.second;
 
     for (const [i, p] of parts.entries()) {
       const u = t - i * STAGGER;
-      const resolve = clamp01((u - RESOLVE[0]) / (RESOLVE[1] - RESOLVE[0]));
+      const appear = clamp01((u - APPEAR[0]) / (APPEAR[1] - APPEAR[0]));
       const drop = easeInOutCubic(clamp01((u - ASSEMBLE[0]) / (ASSEMBLE[1] - ASSEMBLE[0])));
 
-      p.bits.visible = u > 0 && resolve < 1;
-      p.bitMat.uniforms.uTime.value = u;
-      p.bitMat.uniforms.uFade.value = resolve;
-      p.line.opacity = 0.85 * easeOutCubic(resolve);
+      p.line.opacity = (p.name === "crystal" ? 0.35 : 0.85) * easeOutCubic(appear);
       p.group.visible = u > 0;
 
       // Assembled place: on the mainplate, or riding the turning cage.
@@ -557,7 +540,6 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
     seek: stage.seek,
     dispose() {
       view.disconnect();
-      atlas.dispose();
       stage.dispose();
     },
   };
