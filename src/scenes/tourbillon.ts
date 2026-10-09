@@ -1,9 +1,6 @@
 import {
-  AmbientLight,
   BufferGeometry,
-  CanvasTexture,
   Color,
-  DirectionalLight,
   DoubleSide,
   EdgesGeometry,
   ExtrudeGeometry,
@@ -11,14 +8,11 @@ import {
   Group,
   LineBasicMaterial,
   LineSegments,
-  Material,
   Matrix4,
   Mesh,
-  MeshStandardMaterial,
+  MeshBasicMaterial,
   Path,
-  RepeatWrapping,
   Shape,
-  SRGBColorSpace,
   Vector2,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -26,7 +20,7 @@ import { clamp01, easeInOutCubic, easeOutCubic } from "../lib/motion";
 import { createStage } from "./stage";
 
 /*
- * A forged-carbon tourbillon wristwatch assembling itself, part by part, from an exploded
+ * A tourbillon wristwatch, drawn in line, assembling itself part by part from an exploded
  * view.
  *
  * The movement goes together first: mainplate with Côtes de Genève, barrel and mainspring,
@@ -34,13 +28,14 @@ import { createStage } from "./stage";
  * the tourbillon (cage, escapement, balance, hairspring), with ruby jewels and slotted
  * screws. Then the watch closes round it: cushion case with integrated lugs, caseback,
  * crown, waffle dial (open at six onto the tourbillon), hands, flat bezel, crystal and an
- * integrated rubber strap.
+ * articulated link bracelet.
  *
- * Proportions follow a 40 mm integrated-bracelet sports watch (cushion case, flat round
- * bezel, ~11 mm thick, small crown), in units where the case is about radius 1. Parts are
- * solid: shaded faces under light, with their edges drawn on top. Once whole the watch
- * runs: the hands show the viewer's local time (seconds in tenths), the cage turns, the
- * balance swings, the escape wheel ticks and the train turns.
+ * Case proportions follow a 40 mm integrated-bracelet sports watch in forged carbon
+ * (cushion case, flat round bezel, ~11 mm thick, small crown); the carbon is suggested by
+ * faint fibre strokes. It is a wireframe throughout: each part's solid only hides the
+ * lines behind it once the part has seated, like a hidden-line drawing. Once whole the
+ * watch runs: the hands show the viewer's local time (seconds in tenths), the cage turns,
+ * the balance swings, the escape wheel ticks and the train turns.
  */
 
 // --- Timeline (ms) ---------------------------------------------------------------------
@@ -60,8 +55,6 @@ const TRAIN_SPEED = 0.6; // centre wheel, rad/s
 const EDGE = new Color(0xd8d8d8);
 const RUBY = new Color(0xc8312b); // the site's seal red: jewels and the seconds hand
 const ENGRAVED = new Color(0x4a4a4a); // finishing cut into surfaces: stripes, waffle
-
-type Fill = "steel" | "carbon" | "dial" | "rubber";
 
 const TAU = Math.PI * 2;
 const v2 = (x: number, y: number) => new Vector2(x, y);
@@ -231,7 +224,8 @@ function caseOutline() {
 
 // --- 3D parts: solids (faces + edges) and engraved lines ------------------------------------
 
-type Piece = BufferGeometry & { userData: { fills?: { fill: Fill; g: BufferGeometry }[] } };
+/** Line geometry, carrying the solid faces it outlines (used only to hide lines behind them). */
+type Piece = BufferGeometry & { userData: { faces?: BufferGeometry[] } };
 
 function paint(g: BufferGeometry, color: Color) {
   const n = g.getAttribute("position").count;
@@ -241,18 +235,18 @@ function paint(g: BufferGeometry, color: Color) {
   return g;
 }
 
-/** An extruded solid: its feature edges, carrying its faces (to be filled with `fill`). */
-function solid(shape: Shape, depth: number, z: number, fill: Fill = "steel"): Piece {
+/** An extruded solid: its feature edges, carrying its faces. */
+function solid(shape: Shape, depth: number, z: number): Piece {
   const g = new ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 40 }).translate(0, 0, z);
   const e = new EdgesGeometry(g, 25) as Piece;
-  e.userData.fills = [{ fill, g }];
+  e.userData.faces = [g];
   return e;
 }
 
 /** Applies a transform to a piece's edges and faces alike. */
 function xf(g: Piece, m: Matrix4) {
   g.applyMatrix4(m);
-  for (const f of g.userData.fills ?? []) f.g.applyMatrix4(m);
+  for (const f of g.userData.faces ?? []) f.applyMatrix4(m);
   return g;
 }
 
@@ -299,14 +293,14 @@ function spiral(r0: number, r1: number, turns: number, z: number) {
 
 /** Merges pieces: edges into one geometry (unpainted edges are steel), faces carried along. */
 function merge(...gs: Piece[]): Piece {
-  const fills = gs.flatMap((g) => g.userData.fills ?? []);
+  const faces = gs.flatMap((g) => g.userData.faces ?? []);
   const merged = mergeGeometries(
     gs.map((g) => {
       const flat = g.index ? g.toNonIndexed() : g;
       return flat.getAttribute("color") ? flat : paint(flat, EDGE);
     }),
   ) as Piece;
-  merged.userData = { fills };
+  merged.userData = { faces };
   return merged;
 }
 
@@ -328,7 +322,7 @@ function screw(c: Vector2, z: number, r = 0.026) {
 /** A ruby jewel in its chaton, held by two small screws. */
 function jewel(c: Vector2, z: number) {
   const ruby = paint(merge(hoop(0.026, z + 0.012, c, 32), hoop(0.01, z + 0.012, c, 24)), RUBY) as Piece;
-  ruby.userData = { fills: [] };
+  ruby.userData = { faces: [] };
   const a = rand(Math.round(c.x * 997) + Math.round(c.y * 991)) * TAU;
   return merge(
     solid(disc(0.042, c), 0.012, z),
@@ -362,9 +356,29 @@ function hatch(r: number, angle: number, pitch: number, hole: { c: Vector2; r: n
   return paint(lines(pts), ENGRAVED) as Piece;
 }
 
+/** Forged carbon, in line: short curved fibre strokes scattered over a ring's top face. */
+function carbonFibres(r0: number, r1: number, z: number, count: number, seed: number) {
+  const pts: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const r = r0 + 0.01 + rand(seed + i * 5) * (r1 - r0 - 0.02);
+    const c = polar(r, rand(seed + i * 5 + 1) * TAU);
+    const a = rand(seed + i * 5 + 2) * Math.PI;
+    const len = 0.03 + rand(seed + i * 5 + 3) * 0.06;
+    const bow = (rand(seed + i * 5 + 4) - 0.5) * 0.02;
+    let prev = polar(-len / 2, a, c);
+    for (let k = 1; k <= 4; k++) {
+      const t = k / 4 - 0.5;
+      const q = polar(t * len, a, c).add(polar(bow * (1 - 4 * t * t), a + Math.PI / 2));
+      pts.push(prev.x, prev.y, z, q.x, q.y, z);
+      prev = q;
+    }
+  }
+  return paint(lines(pts), ENGRAVED) as Piece;
+}
+
 /** Bends everything beyond |y| = from down and away, the way lugs and straps follow a wrist. */
 function bendAway(g: Piece, from: number, k: number) {
-  const faces = (g.userData.fills ?? []).map((f) => f.g);
+  const faces = g.userData.faces ?? [];
   for (const geo of [g, ...faces]) {
     const p = geo.getAttribute("position");
     for (let i = 0; i < p.count; i++) {
@@ -563,20 +577,54 @@ const MOVEMENT: PartDef[] = [
   },
 ].map((p) => ({ ...p, layer: "movement" as const }));
 
-/** Integrated rubber strap for one side (sy = 1 at twelve, -1 at six), ridged across. */
-function strap(sy: number) {
-  const len = 1.5;
-  const y = (t: number) => LUG_END - 0.005 + len * t;
-  const half = (t: number) => LUG_HALF - 0.13 * t;
-  const right = Array.from({ length: 25 }, (_, i) => v2(half(i / 24), y(i / 24)));
-  const left = right.map((p) => v2(-p.x, p.y)).reverse();
-  const ridges: number[] = [];
-  for (let i = 1; i < 16; i++) {
-    const t = i / 16;
-    ridges.push(-half(t) + 0.06, y(t), -0.08, half(t) - 0.06, y(t), -0.08);
+/**
+ * Articulated link bracelet for one side (sy = 1 at twelve, -1 at six): wide links, each
+ * with one rounded window, joined by pins whose ends show at the edges. Tapers away from
+ * the case.
+ */
+function bracelet(sy: number) {
+  const LINKS = 6;
+  const pitch = 0.26;
+  const gap = 0.025;
+  const parts: Piece[] = [];
+  for (let k = 0; k < LINKS; k++) {
+    const y0 = LUG_END + 0.01 + k * pitch;
+    const y1 = y0 + pitch - gap;
+    const half = (y: number) => LUG_HALF - 0.012 - ((y - LUG_END) / (LINKS * pitch)) * 0.14;
+    const corner = 0.04;
+    const link = new Shape();
+    link.moveTo(-half(y0) + corner, y0);
+    link.lineTo(half(y0) - corner, y0);
+    link.quadraticCurveTo(half(y0), y0, half(y0), y0 + corner);
+    link.lineTo(half(y1), y1 - corner);
+    link.quadraticCurveTo(half(y1), y1, half(y1) - corner, y1);
+    link.lineTo(-half(y1) + corner, y1);
+    link.quadraticCurveTo(-half(y1), y1, -half(y1), y1 - corner);
+    link.lineTo(-half(y0), y0 + corner);
+    link.quadraticCurveTo(-half(y0), y0, -half(y0) + corner, y0);
+    // One rounded window across the middle of the link.
+    const ry = (y1 - y0) / 2 - 0.065;
+    const cy = (y0 + y1) / 2;
+    const reach = half(y1) - 0.12 - ry;
+    const w = new Path();
+    w.absarc(reach, cy, ry, -Math.PI / 2, Math.PI / 2, false);
+    w.absarc(-reach, cy, ry, Math.PI / 2, (3 * Math.PI) / 2, false);
+    link.holes.push(w);
+    parts.push(solid(link, 0.07, -0.18));
+    // Pin through the joint, its ends showing at each edge.
+    const yp = y1 + gap / 2;
+    const pin: number[] = [-half(yp), yp, -0.145, half(yp), yp, -0.145];
+    for (const sx of [-1, 1]) {
+      // Pin end: a small circle in the YZ plane at the bracelet's edge.
+      for (let j = 0; j < 16; j++) {
+        const p = polar(0.022, (j * TAU) / 16);
+        const q = polar(0.022, ((j + 1) * TAU) / 16);
+        pin.push(sx * half(yp), yp + p.x, -0.145 + p.y, sx * half(yp), yp + q.x, -0.145 + q.y);
+      }
+    }
+    parts.push(lines(pin));
   }
-  const piece = merge(solid(new Shape([...right, ...left]), 0.1, -0.18, "rubber"), lines(ridges));
-  return bendAway(xf(piece, new Matrix4().makeScale(1, sy, 1)), 1.2, 0.5);
+  return bendAway(xf(merge(...parts), new Matrix4().makeScale(1, sy, 1)), 1.2, 0.45);
 }
 
 const CASE: PartDef[] = [
@@ -590,9 +638,10 @@ const CASE: PartDef[] = [
       const back = disc(0.8);
       back.holes.push(circle(0.6)); // display back
       return merge(
-        bendAway(solid(body, 0.38, -0.26, "carbon"), 0.95, 0.8),
-        solid(back, 0.04, -0.3, "carbon"),
+        bendAway(solid(body, 0.38, -0.26), 0.95, 0.8),
+        solid(back, 0.04, -0.3),
         hoop(0.62, -0.3),
+        carbonFibres(0.9, 1.0, 0.121, 70, 3), // the case shoulders outside the bezel
       );
     },
   },
@@ -616,7 +665,7 @@ const CASE: PartDef[] = [
       const hole = { c: APERTURE.c, r: APERTURE.r + 0.015 };
       // Waffle: a fine engraved grid both ways, clear of the aperture.
       const waffle = [hatch(0.66, 0, 0.045, hole, z + 0.001), hatch(0.66, Math.PI / 2, 0.045, hole, z + 0.001)];
-      const parts: Piece[] = [solid(dial, 0.02, 0, "dial"), ...waffle, hoop(0.735, z + 0.001, v2(0, 0), 128), hoop(APERTURE.r + 0.04, z + 0.001, APERTURE.c, 64)];
+      const parts: Piece[] = [solid(dial, 0.02, 0), ...waffle, hoop(0.735, z + 0.001, v2(0, 0), 128), hoop(APERTURE.r + 0.04, z + 0.001, APERTURE.c, 64)];
       const ticks: number[] = [];
       for (let k = 0; k < 60; k++) {
         const a = Math.PI / 2 - (k * TAU) / 60;
@@ -673,7 +722,7 @@ const CASE: PartDef[] = [
       // Flat, wide and round, sitting on the cushion case.
       const ring = disc(0.9);
       ring.holes.push(circle(DIAL_R));
-      return merge(solid(ring, 0.08, 0.12, "carbon"), hoop(0.78, 0.2, v2(0, 0), 128));
+      return merge(solid(ring, 0.08, 0.12), hoop(0.78, 0.2, v2(0, 0), 128), carbonFibres(DIAL_R, 0.9, 0.201, 140, 7));
     },
   },
   {
@@ -691,66 +740,31 @@ const CASE: PartDef[] = [
       return merge(hoop(DIAL_R, 0.19, v2(0, 0), 128), lines(glint));
     },
   },
-  { name: "strap", at: v2(0, 0), straight: true, build: () => merge(strap(1), strap(-1)) },
+  { name: "bracelet", at: v2(0, 0), straight: true, build: () => merge(bracelet(1), bracelet(-1)) },
 ].map((p) => ({ ...p, layer: "case" as const }));
 
 const PARTS: PartDef[] = [...MOVEMENT, ...CASE];
 
-// --- Materials ------------------------------------------------------------------------------
+// --- Hidden lines -------------------------------------------------------------------------
 
-/** Forged carbon: chopped-fibre flakes pressed together, black with grey marbling. */
-function forgedCarbon() {
-  const c = document.createElement("canvas");
-  c.width = c.height = 512;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#0c0c0c";
-  g.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 900; i++) {
-    const x = rand(i * 3 + 1) * 512;
-    const y = rand(i * 3 + 2) * 512;
-    const len = 18 + rand(i * 5) * 70;
-    const wid = 4 + rand(i * 7) * 16;
-    const a = rand(i * 11) * Math.PI;
-    const shade = 16 + Math.floor(rand(i * 13) * 34);
-    g.save();
-    g.translate(x, y);
-    g.rotate(a);
-    g.globalAlpha = 0.55;
-    g.fillStyle = `rgb(${shade},${shade},${shade})`;
-    g.beginPath();
-    g.moveTo(-len / 2, 0);
-    g.quadraticCurveTo(0, -wid, len / 2, 0);
-    g.quadraticCurveTo(0, wid * 0.6, -len / 2, 0);
-    g.fill();
-    g.restore();
-  }
-  const t = new CanvasTexture(c);
-  t.wrapS = t.wrapT = RepeatWrapping;
-  t.repeat.set(1.6, 1.6);
-  t.colorSpace = SRGBColorSpace;
-  return t;
-}
-
-function fillMaterials() {
-  // Double-sided: the mirrored strap and bent lugs flip some faces.
-  const base = { transparent: true, opacity: 0, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
-  const carbon = forgedCarbon();
-  return {
-    steel: () => new MeshStandardMaterial({ ...base, color: 0x2c2c2e, roughness: 0.35, metalness: 0.55 }),
-    carbon: () => new MeshStandardMaterial({ ...base, map: carbon, roughness: 0.5, metalness: 0.15 }),
-    dial: () => new MeshStandardMaterial({ ...base, color: 0x0d0d0e, roughness: 0.7, metalness: 0.2 }),
-    rubber: () => new MeshStandardMaterial({ ...base, color: 0x121212, roughness: 0.95, metalness: 0 }),
-    dispose: () => carbon.dispose(),
-  };
-}
+/**
+ * Invisible solids: they write depth but no colour, so lines behind a seated part are
+ * hidden and the drawing reads as a whole object, while staying pure line work.
+ */
+const occluder = new MeshBasicMaterial({
+  colorWrite: false,
+  side: DoubleSide, // mirrored bracelet and bent lugs flip some faces
+  polygonOffset: true,
+  polygonOffsetFactor: 1,
+  polygonOffsetUnits: 1,
+});
 
 // --- Scene ----------------------------------------------------------------------------------
 
 type Part = PartDef & {
   group: Group;
-  materials: Material[];
   edges: LineBasicMaterial;
-  shown: boolean;
+  solid: Mesh | null;
   spin: number; // rotation it forms at, unwound as it drops in
 };
 
@@ -768,13 +782,6 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
   stage.setShift(1);
   camera.position.set(0, 0, DISTANCE);
 
-  scene.add(new AmbientLight(0xffffff, 0.7));
-  const key = new DirectionalLight(0xffffff, 2.2);
-  key.position.set(-2, 3, 4);
-  const rim = new DirectionalLight(0xffffff, 0.8);
-  rim.position.set(3, -1, 2);
-  scene.add(key, rim);
-
   const watch = new Group();
   const movement = new Group();
   movement.scale.setScalar(MOVEMENT_SCALE);
@@ -782,25 +789,20 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
   watch.add(movement);
   scene.add(watch);
 
-  const make = fillMaterials();
   const parts: Part[] = PARTS.map((def, i) => {
     const group = new Group();
     const piece = merge(def.build());
     const edges = new LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false });
     group.add(new LineSegments(piece, edges));
-
-    // Faces, merged per finish.
-    const materials: Material[] = [edges];
-    const byFill = new Map<Fill, BufferGeometry[]>();
-    for (const f of piece.userData.fills ?? []) byFill.set(f.fill, [...(byFill.get(f.fill) ?? []), f.g]);
-    for (const [fill, gs] of byFill) {
-      const mat = make[fill]();
-      materials.push(mat);
-      group.add(new Mesh(mergeGeometries(gs.map((g) => (g.index ? g.toNonIndexed() : g))), mat));
+    const faces = piece.userData.faces ?? [];
+    let solid: Mesh | null = null;
+    if (faces.length) {
+      solid = new Mesh(mergeGeometries(faces.map((g) => (g.index ? g.toNonIndexed() : g))), occluder);
+      solid.visible = false; // hides nothing until the part has seated
+      group.add(solid);
     }
-
     (def.layer === "movement" ? movement : watch).add(group);
-    return { ...def, group, materials, edges, shown: false, spin: def.straight ? 0 : (rand(i + 9) - 0.5) * 1.2 };
+    return { ...def, group, edges, solid, spin: def.straight ? 0 : (rand(i + 9) - 0.5) * 1.2 };
   });
 
   const total = (parts.length - 1) * STAGGER + ASSEMBLE[1];
@@ -844,18 +846,8 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
       const drop = easeInOutCubic(clamp01((u - ASSEMBLE[0]) / (ASSEMBLE[1] - ASSEMBLE[0])));
 
       p.group.visible = u > 0;
-      if (!p.shown) {
-        for (const m of p.materials) m.opacity = appear * (m === p.edges ? 0.6 : 1);
-        // Once fully in, faces turn opaque so they hide what's behind them.
-        if (appear >= 1) {
-          p.shown = true;
-          for (const m of p.materials) {
-            if (m === p.edges) continue;
-            m.transparent = false;
-            m.needsUpdate = true;
-          }
-        }
-      }
+      p.edges.opacity = 0.9 * appear;
+      if (p.solid) p.solid.visible = drop >= 1;
 
       // Assembled place: in the movement or case, or riding the turning cage.
       let x = p.at.x;
@@ -889,7 +881,7 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
     seek: stage.seek,
     dispose() {
       view.disconnect();
-      make.dispose();
+      occluder.dispose();
       stage.dispose();
     },
   };
