@@ -8,6 +8,10 @@
  * writes (press on landing, sweep, stop at turns, flick out of hooks, lift between strokes).
  * Thresholding that map over 3s writes the character in stroke order.
  *
+ * The threshold runs in JS on a canvas every frame, so it behaves the same on every browser
+ * (mobile Safari won't repaint an animated SVG filter inside a mask). Once written, the
+ * canvas hands over to the vector SVG so the dive stays sharp at any zoom.
+ *
  * Then the view dives into solid ink at the centre until it fills the screen, and cuts to
  * the black landing page.
  */
@@ -58,22 +62,12 @@ const { width: W, height: H } = zhang;
             <feMergeNode in="SourceGraphic"></feMergeNode>
           </feMerge>
         </filter>
-        <!-- Reveal: white where the brush has already passed. out = front × (progress − arrival) -->
-        <filter id="reveal-front" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
-          <feComponentTransfer>
-            <feFuncR class="front" type="linear" slope={-FRONT} intercept="0"></feFuncR>
-            <feFuncG class="front" type="linear" slope={-FRONT} intercept="0"></feFuncG>
-            <feFuncB class="front" type="linear" slope={-FRONT} intercept="0"></feFuncB>
-          </feComponentTransfer>
-        </filter>
-        <mask id="reveal" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
-          <image href={zhang.timeMap} width={W} height={H} preserveAspectRatio="none" filter="url(#reveal-front)"></image>
-        </mask>
       </defs>
       <g filter="url(#brush)">
-        <path class="ink" d={zhang.d} mask="url(#reveal)"></path>
+        <path class="ink" d={zhang.d}></path>
       </g>
     </svg>
+    <canvas class="writing" data-time-map={zhang.timeMap}></canvas>
   </div>
 
   <p class="meta">{site.name}</p>
@@ -96,7 +90,8 @@ const { width: W, height: H } = zhang;
 
   if (loader && stage && !root.hasAttribute("data-skip-loader")) {
     const timing: Timing = JSON.parse(loader.dataset.timing!);
-    const fronts = [...loader.querySelectorAll<SVGElement>(".front")];
+    const ink = stage.querySelector<SVGPathElement>("path.ink")!;
+    const writing = stage.querySelector<HTMLCanvasElement>("canvas.writing")!;
     const end = 1 + 1 / timing.front;
     let raf = 0;
     let timer = 0;
@@ -109,15 +104,24 @@ const { width: W, height: H } = zhang;
       loader.remove();
     };
 
-    // Writing: sweep the reveal threshold through the time map.
-    const origin = performance.now();
-    const write = (now: number) => {
-      const progress = Math.min(end, (now - origin) / timing.draw);
-      const intercept = String(timing.front * progress);
-      for (const f of fronts) f.setAttribute("intercept", intercept);
-      if (progress < end) raf = requestAnimationFrame(write);
+    // Writing: sweep the reveal threshold through the time map. Ink shows where
+    // front × (progress − arrival) > 0. When done, the vector SVG takes over.
+    const handOver = () => {
+      loader.classList.add("written");
+      writing.remove();
     };
-    raf = requestAnimationFrame(write);
+    const origin = performance.now();
+    prepareWriting(writing, ink, timing.front)
+      .then((paint) => {
+        const write = (now: number) => {
+          const progress = Math.min(end, (now - origin) / timing.draw);
+          paint(progress);
+          if (progress < end) raf = requestAnimationFrame(write);
+          else handOver();
+        };
+        raf = requestAnimationFrame(write);
+      })
+      .catch(handOver); // no 2D canvas: show the finished character
 
     /** Dives into the centre ink: scale grows exponentially while the target slides to centre. */
     const dive = () => {
@@ -146,6 +150,57 @@ const { width: W, height: H } = zhang;
     addEventListener("keydown", finish, { once: true });
   } else {
     loader?.remove();
+  }
+
+  /**
+   * Sets up the writing canvas: the ink rendered once at device resolution with the same
+   * bleed as the SVG brush filter, and the time map read into arrival times. Resolves to a
+   * painter that shows the character written up to `progress` (0..1 of the writing time).
+   */
+  async function prepareWriting(canvas: HTMLCanvasElement, ink: SVGPathElement, front: number) {
+    const ctx = canvas.getContext("2d");
+    const view = ink.ownerSVGElement!.viewBox.baseVal;
+    if (!ctx || !view.width) throw new Error("no canvas");
+
+    const scale = (canvas.clientWidth * Math.min(2, devicePixelRatio || 1)) / view.width;
+    canvas.width = Math.round(view.width * scale);
+    canvas.height = Math.round(view.height * scale);
+
+    const inkLayer = document.createElement("canvas");
+    inkLayer.width = canvas.width;
+    inkLayer.height = canvas.height;
+    const ic = inkLayer.getContext("2d")!;
+    ic.scale(scale, scale);
+    ic.fillStyle = getComputedStyle(ink).fill;
+    ic.shadowColor = "rgba(11, 10, 9, 0.4)"; // the brush filter's halo: blur 0.8 at 40%
+    ic.shadowBlur = 1.6 * scale;
+    ic.fill(new Path2D(ink.getAttribute("d")!), "evenodd");
+
+    const img = new Image();
+    img.src = canvas.dataset.timeMap!;
+    await img.decode();
+    const mask = document.createElement("canvas");
+    mask.width = img.naturalWidth;
+    mask.height = img.naturalHeight;
+    const mc = mask.getContext("2d", { willReadFrequently: true })!;
+    mc.drawImage(img, 0, 0);
+    const pixels = mc.getImageData(0, 0, mask.width, mask.height);
+    const data = pixels.data;
+    const arrival = new Float32Array(data.length / 4);
+    for (let i = 0; i < arrival.length; i++) arrival[i] = data[i * 4] / 255;
+
+    return (progress: number) => {
+      for (let i = 0; i < arrival.length; i++) {
+        const a = front * (progress - arrival[i]);
+        data[i * 4 + 3] = a <= 0 ? 0 : a >= 1 ? 255 : a * 255;
+      }
+      mc.putImageData(pixels, 0, 0);
+      // Upscale the mask (bilinear softens the wet front), then keep only the ink inside it.
+      ctx.globalCompositeOperation = "copy";
+      ctx.drawImage(mask, 0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = "source-in";
+      ctx.drawImage(inkLayer, 0, 0);
+    };
   }
 </script>
 
@@ -188,6 +243,22 @@ const { width: W, height: H } = zhang;
     width: 100%;
     height: 100%;
     overflow: visible;
+  }
+
+  /* The vector character waits behind the writing canvas until the writing is done. */
+  .stage > svg {
+    visibility: hidden;
+  }
+
+  :global(.written) .stage > svg {
+    visibility: visible;
+  }
+
+  .writing {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
   }
 
   .ink {
