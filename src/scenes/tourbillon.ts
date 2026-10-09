@@ -1,16 +1,24 @@
 import {
+  AmbientLight,
   BufferGeometry,
+  CanvasTexture,
   Color,
+  DirectionalLight,
+  DoubleSide,
   EdgesGeometry,
   ExtrudeGeometry,
   Float32BufferAttribute,
   Group,
-  LatheGeometry,
   LineBasicMaterial,
   LineSegments,
+  Material,
   Matrix4,
+  Mesh,
+  MeshStandardMaterial,
   Path,
+  RepeatWrapping,
   Shape,
+  SRGBColorSpace,
   Vector2,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -18,37 +26,42 @@ import { clamp01, easeInOutCubic, easeOutCubic } from "../lib/motion";
 import { createStage } from "./stage";
 
 /*
- * A tourbillon wristwatch assembling itself, part by part, from an exploded view.
+ * A forged-carbon tourbillon wristwatch assembling itself, part by part, from an exploded
+ * view.
  *
- * The movement goes together first, down in the case: mainplate with Côtes de Genève,
- * barrel and mainspring, barrel bridge with ratchet, crown wheel and click, the gear
- * train and its bridge, then the tourbillon (cage, escapement, balance, hairspring) under
- * its bridge, with ruby jewels and slotted screws throughout. Then the case closes round
- * it: case, crown, open-worked dial, hands, bezel, domed crystal and straps.
+ * The movement goes together first: mainplate with Côtes de Genève, barrel and mainspring,
+ * barrel bridge with ratchet, crown wheel and click, the gear train under its bridge, then
+ * the tourbillon (cage, escapement, balance, hairspring), with ruby jewels and slotted
+ * screws. Then the watch closes round it: cushion case with integrated lugs, caseback,
+ * crown, waffle dial (open at six onto the tourbillon), hands, flat bezel, crystal and an
+ * integrated rubber strap.
  *
- * Proportions follow a 41 mm dive-watch case (50 mm lug to lug, 22 mm lugs, 14.75 mm
- * thick, a large crown), in units where the case radius is 1. Once whole, the watch runs:
- * the hands show the viewer's local time, the cage turns, the balance swings, the escape
- * wheel ticks and the train turns.
+ * Proportions follow a 40 mm integrated-bracelet sports watch (cushion case, flat round
+ * bezel, ~11 mm thick, small crown), in units where the case is about radius 1. Parts are
+ * solid: shaded faces under light, with their edges drawn on top. Once whole the watch
+ * runs: the hands show the viewer's local time (seconds in tenths), the cage turns, the
+ * balance swings, the escape wheel ticks and the train turns.
  */
 
 // --- Timeline (ms) ---------------------------------------------------------------------
 
 const STAGGER = 260; // between parts starting
-const APPEAR = [0, 450]; // the wireframe fades in above its place
+const APPEAR = [0, 450]; // the part fades in above its place
 const ASSEMBLE = [200, 1100]; // and drops into it
 const LIFT = 0.8; // exploded-view height a part forms at
 
-const DISTANCE = 5.4; // camera to watch, on landscape screens
+const DISTANCE = 5.6; // camera to watch, on landscape screens
 const BALANCE_HZ = 2;
 const CAGE_PERIOD = 12_000; // a real cage turns once a minute; quicker reads better here
 const TRAIN_SPEED = 0.6; // centre wheel, rad/s
 
 // --- Palette --------------------------------------------------------------------------------
 
-const STEEL = new Color(0xededed);
+const EDGE = new Color(0xd8d8d8);
 const RUBY = new Color(0xc8312b); // the site's seal red: jewels and the seconds hand
-const ENGRAVED = new Color(0x3a3a3a); // finishing lines cut into surfaces
+const ENGRAVED = new Color(0x4a4a4a); // finishing cut into surfaces: stripes, waffle
+
+type Fill = "steel" | "carbon" | "dial" | "rubber";
 
 const TAU = Math.PI * 2;
 const v2 = (x: number, y: number) => new Vector2(x, y);
@@ -72,15 +85,14 @@ const CROWN_WHEEL = polar(0.35, -0.05, BARREL); // meshes with the ratchet, towa
 const ESCAPE = v2(0.13, 0.04); // inside the cage, cage-local
 const PALLET = v2(0.075, 0.023);
 
-const MOVEMENT_SCALE = 0.82;
-const MOVEMENT_Z = -0.32; // mainplate top, in watch units
+const MOVEMENT_SCALE = 0.72;
+const MOVEMENT_Z = -0.24; // mainplate top, in watch units
 
-// Watch-level (case radius 1).
-const DIAL_R = 0.8;
-const DIAL_IN = 0.6; // the open centre of the dial
-const LUG_GAP = 0.537; // half the 22 mm lug width
-const LUG_TIP = 1.22; // half the 50 mm lug to lug
-const APERTURE = { c: CAGE.clone().multiplyScalar(MOVEMENT_SCALE), r: 0.33 * MOVEMENT_SCALE };
+// Watch-level.
+const DIAL_R = 0.76;
+const LUG_HALF = 0.66; // integrated lugs: half-width where the strap joins
+const LUG_END = 1.12;
+const APERTURE = { c: CAGE.clone().multiplyScalar(MOVEMENT_SCALE), r: 0.34 * MOVEMENT_SCALE };
 
 // --- 2D outlines ----------------------------------------------------------------------------
 
@@ -174,7 +186,52 @@ function bridge(p0: Vector2, p1: Vector2, w: number, boss?: { at: number; r: num
   return new Shape(pts.map(place));
 }
 
-// --- 3D wireframes --------------------------------------------------------------------------
+/**
+ * Case outline: a cushion (superellipse) with the lugs carried straight out at twelve and
+ * six, where the strap integrates. Subdivided so the lugs can bend toward the wrist.
+ */
+function caseOutline() {
+  const a = 1.0;
+  const b = 0.92;
+  const n = 4;
+  const lugX = 0.74;
+  const se = (t: number) => {
+    const c = Math.cos(t);
+    const s = Math.sin(t);
+    return v2(a * Math.sign(c) * Math.abs(c) ** (2 / n), b * Math.sign(s) * Math.abs(s) ** (2 / n));
+  };
+  const pts: Vector2[] = [];
+  const lug = (sy: number) => {
+    // From the shoulder at +x (sy=1) or -x (sy=-1), out along the lug and back.
+    const side = (x0: number, x1: number, y0: number) =>
+      Array.from({ length: 9 }, (_, i) => v2(x0 + ((x1 - x0) * i) / 8, sy * (y0 + ((LUG_END - y0) * i) / 8)));
+    const y0 = b * (1 - lugX ** n) ** (1 / n);
+    const out = side(sy * lugX, sy * LUG_HALF, y0);
+    const back = side(-sy * lugX, -sy * LUG_HALF, y0).reverse();
+    return [...out, ...back];
+  };
+  let inTop = false;
+  let inBottom = false;
+  for (let k = 0; k < 360; k++) {
+    const p = se((k / 360) * TAU);
+    if (Math.abs(p.x) < 0.74 && p.y > 0) {
+      if (!inTop) pts.push(...lug(1));
+      inTop = true;
+      continue;
+    }
+    if (Math.abs(p.x) < 0.74 && p.y < 0) {
+      if (!inBottom) pts.push(...lug(-1));
+      inBottom = true;
+      continue;
+    }
+    pts.push(p);
+  }
+  return new Shape(pts);
+}
+
+// --- 3D parts: solids (faces + edges) and engraved lines ------------------------------------
+
+type Piece = BufferGeometry & { userData: { fills?: { fill: Fill; g: BufferGeometry }[] } };
 
 function paint(g: BufferGeometry, color: Color) {
   const n = g.getAttribute("position").count;
@@ -184,17 +241,25 @@ function paint(g: BufferGeometry, color: Color) {
   return g;
 }
 
-function solid(shape: Shape, depth: number, z: number) {
-  const g = new ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 40 });
-  const e = new EdgesGeometry(g, 25);
-  g.dispose();
-  return e.translate(0, 0, z);
+/** An extruded solid: its feature edges, carrying its faces (to be filled with `fill`). */
+function solid(shape: Shape, depth: number, z: number, fill: Fill = "steel"): Piece {
+  const g = new ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 40 }).translate(0, 0, z);
+  const e = new EdgesGeometry(g, 25) as Piece;
+  e.userData.fills = [{ fill, g }];
+  return e;
 }
 
-function lines(points: number[]) {
+/** Applies a transform to a piece's edges and faces alike. */
+function xf(g: Piece, m: Matrix4) {
+  g.applyMatrix4(m);
+  for (const f of g.userData.fills ?? []) f.g.applyMatrix4(m);
+  return g;
+}
+
+function lines(points: number[]): Piece {
   const g = new BufferGeometry();
   g.setAttribute("position", new Float32BufferAttribute(points, 3));
-  return g;
+  return g as Piece;
 }
 
 /** A circle drawn as a line loop. */
@@ -208,7 +273,7 @@ function hoop(r: number, z: number, c = v2(0, 0), n = 64) {
   return lines(pts);
 }
 
-/** A closed polygon drawn as lines (e.g. lume inlays on hands and indices). */
+/** A closed polygon drawn as lines (lume inlays on hands and indices). */
 function outline(pts: Vector2[], z: number) {
   const out: number[] = [];
   pts.forEach((a, i) => {
@@ -232,14 +297,18 @@ function spiral(r0: number, r1: number, turns: number, z: number) {
   return lines(pts);
 }
 
-/** Merges wireframes; anything not painted is steel. */
-const merge = (...gs: BufferGeometry[]) =>
-  mergeGeometries(
+/** Merges pieces: edges into one geometry (unpainted edges are steel), faces carried along. */
+function merge(...gs: Piece[]): Piece {
+  const fills = gs.flatMap((g) => g.userData.fills ?? []);
+  const merged = mergeGeometries(
     gs.map((g) => {
       const flat = g.index ? g.toNonIndexed() : g;
-      return flat.getAttribute("color") ? flat : paint(flat, STEEL);
+      return flat.getAttribute("color") ? flat : paint(flat, EDGE);
     }),
-  );
+  ) as Piece;
+  merged.userData = { fills };
+  return merged;
+}
 
 /** A slotted screw head sitting on a surface at height z. */
 function screw(c: Vector2, z: number, r = 0.026) {
@@ -258,25 +327,30 @@ function screw(c: Vector2, z: number, r = 0.026) {
 
 /** A ruby jewel in its chaton, held by two small screws. */
 function jewel(c: Vector2, z: number) {
-  const ruby = paint(merge(hoop(0.026, z, c, 32), hoop(0.01, z, c, 24)), RUBY);
+  const ruby = paint(merge(hoop(0.026, z + 0.012, c, 32), hoop(0.01, z + 0.012, c, 24)), RUBY) as Piece;
+  ruby.userData = { fills: [] };
   const a = rand(Math.round(c.x * 997) + Math.round(c.y * 991)) * TAU;
-  return merge(ruby, hoop(0.042, z, c, 40), screw(polar(0.058, a, c), z, 0.012), screw(polar(0.058, a + Math.PI, c), z, 0.012));
+  return merge(
+    solid(disc(0.042, c), 0.012, z),
+    ruby,
+    screw(polar(0.058, a, c), z, 0.012),
+    screw(polar(0.058, a + Math.PI, c), z, 0.012),
+  );
 }
 
-/** Côtes de Genève: parallel stripes across the plate, clear of the tourbillon aperture. */
-function genevaStripes(r: number, hole: { c: Vector2; r: number }, z: number) {
+/** Parallel lines across a disc of radius r, clear of a round hole (stripes, waffle). */
+function hatch(r: number, angle: number, pitch: number, hole: { c: Vector2; r: number }, z: number) {
   const pts: number[] = [];
-  const dir = polar(1, 0.5);
-  const n = polar(1, 0.5 + Math.PI / 2);
-  for (let off = -r + 0.04; off < r; off += 0.075) {
+  const dir = polar(1, angle);
+  const n = polar(1, angle + Math.PI / 2);
+  for (let off = -r + pitch / 2; off < r; off += pitch) {
     const half = Math.sqrt(r * r - off * off);
-    const spans: [number, number][] = [[-half, half]];
-    // Cut out where the stripe crosses the aperture.
+    let spans: [number, number][] = [[-half, half]];
     const rel = hole.c.dot(n) - off;
     if (Math.abs(rel) < hole.r) {
       const mid = hole.c.dot(dir);
       const h = Math.sqrt(hole.r * hole.r - rel * rel);
-      spans.splice(0, 1, [-half, mid - h], [mid + h, half]);
+      spans = [[-half, mid - h], [mid + h, half]];
     }
     for (const [t0, t1] of spans) {
       if (t1 <= t0) continue;
@@ -285,22 +359,26 @@ function genevaStripes(r: number, hole: { c: Vector2; r: number }, z: number) {
       pts.push(a.x, a.y, z, b.x, b.y, z);
     }
   }
-  return paint(lines(pts), ENGRAVED);
+  return paint(lines(pts), ENGRAVED) as Piece;
 }
 
-/** Bends anything beyond |y| = from down and away, the way lugs and straps follow a wrist. */
-function bendAway(g: BufferGeometry, from: number, k: number) {
-  const p = g.getAttribute("position");
-  for (let i = 0; i < p.count; i++) {
-    const over = Math.max(0, Math.abs(p.getY(i)) - from);
-    p.setZ(i, p.getZ(i) - over * over * k);
+/** Bends everything beyond |y| = from down and away, the way lugs and straps follow a wrist. */
+function bendAway(g: Piece, from: number, k: number) {
+  const faces = (g.userData.fills ?? []).map((f) => f.g);
+  for (const geo of [g, ...faces]) {
+    const p = geo.getAttribute("position");
+    for (let i = 0; i < p.count; i++) {
+      const over = Math.max(0, Math.abs(p.getY(i)) - from);
+      p.setZ(i, p.getZ(i) - over * over * k);
+    }
   }
+  for (const geo of faces) geo.computeVertexNormals(); // edges carry no normals
   return g;
 }
 
-/** Turns a shape built along +Z to lie along +X (crown and tube), then places it. */
-const alongX = (g: BufferGeometry, x: number, z: number) =>
-  g.applyMatrix4(new Matrix4().makeRotationY(Math.PI / 2).premultiply(new Matrix4().makeTranslation(x, 0, z)));
+/** Turns a piece built along +Z to lie along +X (crown and tube), then places it. */
+const alongX = (g: Piece, x: number, z: number) =>
+  xf(g, new Matrix4().makeRotationY(Math.PI / 2).premultiply(new Matrix4().makeTranslation(x, 0, z)));
 
 // --- Parts ----------------------------------------------------------------------------------
 
@@ -313,8 +391,7 @@ type PartDef = {
   inCage?: boolean;
   /** Built off-centre (bridges, straps): drops straight rather than spinning round the centre. */
   straight?: boolean;
-  opacity?: number;
-  build: () => BufferGeometry;
+  build: () => Piece;
 };
 
 const cageFrame = (z: number) => solid(wheel(0.28, { spokes: 3, rim: 0.255, hub: 0.05 }), 0.02, z);
@@ -328,7 +405,7 @@ const MOVEMENT: PartDef[] = [
       plate.holes.push(circle(0.33, CAGE));
       for (const p of [BARREL, CENTER, THIRD]) plate.holes.push(circle(0.025, p));
       const rim = [0, 1, 2].map((k) => screw(polar(0.92, 0.6 + (k * TAU) / 3), 0));
-      return merge(solid(plate, 0.06, -0.06), genevaStripes(0.95, { c: CAGE, r: 0.36 }, 0.001), ...rim);
+      return merge(solid(plate, 0.06, -0.06), hatch(0.95, 0.5, 0.075, { c: CAGE, r: 0.36 }, 0.002), ...rim);
     },
   },
   {
@@ -382,7 +459,7 @@ const MOVEMENT: PartDef[] = [
         spring.push(a.x, a.y, 0.145, b.x, b.y, 0.145);
       }
       const m = new Matrix4().makeRotationZ(-0.9);
-      return merge(solid(pawl, 0.015, 0.13).applyMatrix4(m), lines(spring).applyMatrix4(m), screw(v2(0, 0), 0.145, 0.014));
+      return merge(xf(solid(pawl, 0.015, 0.13), m), xf(lines(spring), m), screw(v2(0, 0), 0.145, 0.014));
     },
   },
   { name: "centre wheel", at: CENTER, build: () => solid(wheel(0.27, { teeth: 64, spokes: 5 }), 0.025, 0.02) },
@@ -437,10 +514,10 @@ const MOVEMENT: PartDef[] = [
       const s = new Shape(pts);
       s.holes.push(circle(0.007));
       // Ruby pallet stones on each arm.
-      const stones = [-1, 1].map((sy) => paint(outline([v2(0.045, sy * 0.034), v2(0.06, sy * 0.034), v2(0.06, sy * 0.05), v2(0.045, sy * 0.05)], 0.083), RUBY));
-      return merge(solid(s, 0.012, 0.07), ...stones).applyMatrix4(
-        new Matrix4().makeRotationZ(Math.atan2(ESCAPE.y, ESCAPE.x)),
+      const stones = [-1, 1].map((sy) =>
+        paint(outline([v2(0.045, sy * 0.034), v2(0.06, sy * 0.034), v2(0.06, sy * 0.05), v2(0.045, sy * 0.05)], 0.083), RUBY) as Piece,
       );
+      return xf(merge(solid(s, 0.012, 0.07), ...stones), new Matrix4().makeRotationZ(Math.atan2(ESCAPE.y, ESCAPE.x)));
     },
   },
   {
@@ -486,26 +563,20 @@ const MOVEMENT: PartDef[] = [
   },
 ].map((p) => ({ ...p, layer: "movement" as const }));
 
-/** Lug outline (top right), subdivided so it can bend down toward the wrist. */
-function lugShape() {
-  const pts: Vector2[] = [];
-  const x0 = LUG_GAP;
-  const x1 = LUG_GAP + 0.13;
-  const y0 = 0.74;
-  const y1 = LUG_TIP - 0.065;
-  for (let i = 0; i <= 12; i++) pts.push(v2(x1 - 0.012 * (i / 12), y0 + ((y1 - y0) * i) / 12));
-  for (let i = 0; i <= 10; i++) pts.push(polar(0.0645, (i / 10) * Math.PI, v2((x0 + x1 - 0.012) / 2, y1)));
-  for (let i = 12; i >= 0; i--) pts.push(v2(x0, y0 + ((y1 - y0) * i) / 12));
-  return new Shape(pts);
-}
-
-/** Inner contour of the dial: the open centre, merged with the tourbillon aperture at six. */
-function dialInner(theta: number) {
-  const d = polar(1, theta);
-  const along = d.dot(APERTURE.c);
-  const disc2 = along * along - APERTURE.c.lengthSq() + APERTURE.r * APERTURE.r;
-  const toAperture = disc2 > 0 ? along + Math.sqrt(disc2) : 0;
-  return Math.max(DIAL_IN, toAperture + 0.025);
+/** Integrated rubber strap for one side (sy = 1 at twelve, -1 at six), ridged across. */
+function strap(sy: number) {
+  const len = 1.5;
+  const y = (t: number) => LUG_END - 0.005 + len * t;
+  const half = (t: number) => LUG_HALF - 0.13 * t;
+  const right = Array.from({ length: 25 }, (_, i) => v2(half(i / 24), y(i / 24)));
+  const left = right.map((p) => v2(-p.x, p.y)).reverse();
+  const ridges: number[] = [];
+  for (let i = 1; i < 16; i++) {
+    const t = i / 16;
+    ridges.push(-half(t) + 0.06, y(t), -0.08, half(t) - 0.06, y(t), -0.08);
+  }
+  const piece = merge(solid(new Shape([...right, ...left]), 0.1, -0.18, "rubber"), lines(ridges));
+  return bendAway(xf(piece, new Matrix4().makeScale(1, sy, 1)), 1.2, 0.5);
 }
 
 const CASE: PartDef[] = [
@@ -514,31 +585,15 @@ const CASE: PartDef[] = [
     at: v2(0, 0),
     straight: true,
     build: () => {
-      // Turned case body: caseback edge, flanks, then the seat for the bezel.
-      const profile = [
-        [0.84, -0.4], [0.93, -0.4], [0.975, -0.33], [1.0, -0.22], [1.0, 0.08], [0.985, 0.14], [0.86, 0.14],
-        [0.86, -0.4],
-      ].map(([r, z]) => v2(r, z));
-      const body = new EdgesGeometry(new LatheGeometry(profile, 128), 20).applyMatrix4(
-        new Matrix4().makeRotationX(Math.PI / 2),
+      const body = caseOutline();
+      body.holes.push(circle(0.8));
+      const back = disc(0.8);
+      back.holes.push(circle(0.6)); // display back
+      return merge(
+        bendAway(solid(body, 0.38, -0.26, "carbon"), 0.95, 0.8),
+        solid(back, 0.04, -0.3, "carbon"),
+        hoop(0.62, -0.3),
       );
-      // Screw-down caseback with six notches round an exhibition window.
-      const back: Vector2[] = [];
-      for (let k = 0; k < 180; k++) {
-        const a = (k * TAU) / 180;
-        const notch = Math.abs(((a + TAU / 12) % (TAU / 6)) - TAU / 12) < 0.07;
-        back.push(polar(notch ? 0.8 : 0.84, a));
-      }
-      const caseback = new Shape(back);
-      caseback.holes.push(circle(0.62));
-      const lugs = [1, -1].flatMap((sy) =>
-        [1, -1].map((sx) =>
-          bendAway(solid(lugShape(), 0.3, -0.24).applyMatrix4(new Matrix4().makeScale(sx, sy, 1)), 0.95, 1.4),
-        ),
-      );
-      const bar = LUG_TIP - 0.08;
-      const bars = lines([-LUG_GAP, bar, -0.12, LUG_GAP, bar, -0.12, -LUG_GAP, -bar, -0.12, LUG_GAP, -bar, -0.12]);
-      return merge(body, solid(caseback, 0.05, -0.45), ...lugs, bendAway(bars, 0.95, 1.4));
     },
   },
   {
@@ -546,44 +601,39 @@ const CASE: PartDef[] = [
     at: v2(0, 0),
     straight: true,
     build: () => {
-      const tube = alongX(solid(disc(0.075), 0.1, 0), 0.98, -0.08);
-      const knurl = solid(gearOutline(0.185, 30, 0.02), 0.17, 0);
-      const face = merge(hoop(0.12, 0.171), hoop(0.06, 0.171), hoop(0.15, 0.171));
-      return merge(tube, alongX(merge(knurl, face), 1.07, -0.08));
+      const tube = alongX(solid(disc(0.06), 0.08, 0), 0.98, -0.07);
+      const knurl = solid(gearOutline(0.12, 24, 0.014), 0.12, 0);
+      return merge(tube, alongX(merge(knurl, hoop(0.07, 0.121)), 1.04, -0.07));
     },
   },
   {
     name: "dial",
     at: v2(0, 0),
     build: () => {
-      const inner: Vector2[] = [];
-      for (let k = 0; k < 240; k++) {
-        const a = (k * TAU) / 240;
-        inner.push(polar(dialInner(a), a));
-      }
       const dial = disc(DIAL_R);
-      dial.holes.push(new Path(inner));
-      const z = 0.0;
-      const parts = [solid(dial, 0.025, z), hoop(0.78, z + 0.026, v2(0, 0), 128), hoop(0.745, z + 0.026, v2(0, 0), 128)];
+      dial.holes.push(circle(APERTURE.r + 0.015, APERTURE.c));
+      const z = 0.02;
+      const hole = { c: APERTURE.c, r: APERTURE.r + 0.015 };
+      // Waffle: a fine engraved grid both ways, clear of the aperture.
+      const waffle = [hatch(0.66, 0, 0.045, hole, z + 0.001), hatch(0.66, Math.PI / 2, 0.045, hole, z + 0.001)];
+      const parts: Piece[] = [solid(dial, 0.02, 0, "dial"), ...waffle, hoop(0.735, z + 0.001, v2(0, 0), 128), hoop(APERTURE.r + 0.04, z + 0.001, APERTURE.c, 64)];
       const ticks: number[] = [];
       for (let k = 0; k < 60; k++) {
         const a = Math.PI / 2 - (k * TAU) / 60;
-        if (dialInner(a) > 0.72) continue;
-        const p0 = polar(0.745, a);
-        const p1 = polar(0.78, a);
-        ticks.push(p0.x, p0.y, z + 0.026, p1.x, p1.y, z + 0.026);
+        const p0 = polar(0.705, a);
+        const p1 = polar(0.735, a);
+        ticks.push(p0.x, p0.y, z + 0.001, p1.x, p1.y, z + 0.001);
       }
-      // Applied indices with lume inlays; a double baton at twelve.
+      // Applied batons with lume; double at twelve; none at six, over the tourbillon.
       for (let h = 0; h < 12; h++) {
+        if (h === 6) continue;
         const a = Math.PI / 2 - (h * TAU) / 12;
-        if (dialInner(a) > DIAL_IN + 0.03) continue;
-        const offsets = h === 0 ? [-0.026, 0.026] : [0];
-        for (const off of offsets) {
-          const w = h % 3 === 0 ? 0.024 : 0.018;
-          const baton = [v2(off - w, 0.625), v2(off + w, 0.625), v2(off + w * 0.8, 0.725), v2(off - w * 0.8, 0.725)];
-          const lume = baton.map((p) => v2(off + (p.x - off) * 0.5, 0.675 + (p.y - 0.675) * 0.72));
+        for (const off of h === 0 ? [-0.03, 0.03] : [0]) {
+          const w = 0.02;
+          const baton = [v2(off - w, 0.55), v2(off + w, 0.55), v2(off + w, 0.69), v2(off - w, 0.69)];
+          const lume = [v2(off - w * 0.4, 0.57), v2(off + w * 0.4, 0.57), v2(off + w * 0.4, 0.67), v2(off - w * 0.4, 0.67)];
           const m = new Matrix4().makeRotationZ(a - Math.PI / 2);
-          parts.push(solid(new Shape(baton), 0.035, z + 0.025).applyMatrix4(m), outline(lume, z + 0.061).applyMatrix4(m));
+          parts.push(xf(solid(new Shape(baton), 0.025, z), m), xf(outline(lume, z + 0.026), m));
         }
       }
       return merge(...parts, lines(ticks));
@@ -593,102 +643,120 @@ const CASE: PartDef[] = [
     name: "hour hand",
     at: v2(0, 0),
     build: () => {
-      const s = new Shape([v2(-0.02, -0.1), v2(0.02, -0.1), v2(0.042, 0.0), v2(0.036, 0.36), v2(0, 0.45), v2(-0.036, 0.36), v2(-0.042, 0.0)]);
-      s.holes.push(circle(0.014));
-      const lume = [v2(0.022, 0.04), v2(0.019, 0.33), v2(0, 0.39), v2(-0.019, 0.33), v2(-0.022, 0.04)];
-      return merge(solid(s, 0.012, 0.07), outline(lume, 0.083));
+      const s = new Shape([v2(-0.024, -0.08), v2(0.024, -0.08), v2(0.024, 0.4), v2(0, 0.43), v2(-0.024, 0.4)]);
+      s.holes.push(circle(0.012));
+      return merge(solid(s, 0.01, 0.07), outline([v2(-0.01, 0.06), v2(0.01, 0.06), v2(0.01, 0.38), v2(-0.01, 0.38)], 0.081));
     },
   },
   {
     name: "minute hand",
     at: v2(0, 0),
     build: () => {
-      const s = new Shape([v2(-0.016, -0.12), v2(0.016, -0.12), v2(0.03, 0.0), v2(0.025, 0.66), v2(0, 0.745), v2(-0.025, 0.66), v2(-0.03, 0.0)]);
-      s.holes.push(circle(0.014));
-      const lume = [v2(0.015, 0.05), v2(0.012, 0.63), v2(0, 0.69), v2(-0.012, 0.63), v2(-0.015, 0.05)];
-      return merge(solid(s, 0.012, 0.09), outline(lume, 0.103));
+      const s = new Shape([v2(-0.018, -0.1), v2(0.018, -0.1), v2(0.018, 0.66), v2(0, 0.69), v2(-0.018, 0.66)]);
+      s.holes.push(circle(0.012));
+      return merge(solid(s, 0.01, 0.085), outline([v2(-0.007, 0.08), v2(0.007, 0.08), v2(0.007, 0.64), v2(-0.007, 0.64)], 0.096));
     },
   },
   {
     name: "seconds hand",
     at: v2(0, 0),
     build: () => {
-      const needle = new Shape([v2(-0.006, -0.2), v2(0.006, -0.2), v2(0.004, 0.77), v2(-0.004, 0.77)]);
-      const tip = new Shape([v2(-0.022, 0.6), v2(0.022, 0.6), v2(0, 0.68)]);
-      return paint(
-        merge(solid(needle, 0.008, 0.11), solid(tip, 0.008, 0.11), solid(disc(0.035, v2(0, -0.15)), 0.008, 0.11), solid(disc(0.03), 0.022, 0.11)),
-        RUBY,
-      );
+      const needle = new Shape([v2(-0.005, -0.18), v2(0.005, -0.18), v2(0.003, 0.72), v2(-0.003, 0.72)]);
+      const red = paint(merge(solid(needle, 0.006, 0.1), solid(disc(0.03, v2(0, -0.14)), 0.006, 0.1), solid(disc(0.026), 0.016, 0.1)), RUBY) as Piece;
+      return red;
     },
   },
   {
     name: "bezel",
     at: v2(0, 0),
     build: () => {
-      // Smooth body with a thin coin-edge band on top for grip.
-      const body = disc(0.995);
-      body.holes.push(circle(0.82));
-      const grip = gearOutline(1.0, 120, 0.014);
-      grip.holes.push(circle(0.82));
-      const z = 0.28;
-      const marks: number[] = [];
-      for (let k = 0; k < 60; k++) {
-        const a = Math.PI / 2 - (k * TAU) / 60;
-        const p0 = polar(0.86, a);
-        const p1 = polar(k % 5 ? 0.9 : 0.95, a);
-        if (k !== 0) marks.push(p0.x, p0.y, z, p1.x, p1.y, z);
-      }
-      const pip = [v2(0, 0.86), v2(0.035, 0.95), v2(-0.035, 0.95)]; // triangle at twelve
-      return merge(solid(body, 0.1, 0.14), solid(grip, 0.04, 0.24), hoop(0.845, z, v2(0, 0), 128), hoop(0.965, z, v2(0, 0), 128), lines(marks), outline(pip, z));
+      // Flat, wide and round, sitting on the cushion case.
+      const ring = disc(0.9);
+      ring.holes.push(circle(DIAL_R));
+      return merge(solid(ring, 0.08, 0.12, "carbon"), hoop(0.78, 0.2, v2(0, 0), 128));
     },
   },
   {
     name: "crystal",
     at: v2(0, 0),
-    opacity: 0.3,
-    build: () => merge(...[[0.83, 0.28], [0.72, 0.33], [0.5, 0.37], [0.25, 0.39]].map(([r, z]) => hoop(r, z, v2(0, 0), 96))),
-  },
-  {
-    name: "straps",
-    at: v2(0, 0),
-    straight: true,
     build: () => {
-      const y0 = LUG_TIP - 0.14;
-      const len = 1.4;
-      const side = (x0: number, x1: number) =>
-        Array.from({ length: 21 }, (_, i) => v2(x0 + ((x1 - x0) * i) / 20, y0 + (len * i) / 20));
-      const right = side(LUG_GAP - 0.005, 0.46);
-      const left = side(-LUG_GAP + 0.005, -0.46).reverse();
-      const strap = new Shape([...right, ...left]);
-      const stitches: number[] = [];
-      for (const sx of [-1, 1]) {
-        for (let i = 2; i < 28; i += 2) {
-          const ya = y0 + (len * i) / 28;
-          const yb = y0 + (len * (i + 1)) / 28;
-          const x = (y: number) => sx * (LUG_GAP - 0.04 - ((y - y0) / len) * 0.07);
-          stitches.push(x(ya), ya, -0.07, x(yb), yb, -0.07);
+      const glint: number[] = [];
+      for (const [a0, a1, r] of [[2.0, 2.5, 0.68], [2.05, 2.35, 0.6]]) {
+        for (let k = 0; k < 12; k++) {
+          const p = polar(r, a0 + ((a1 - a0) * k) / 12);
+          const q = polar(r, a0 + ((a1 - a0) * (k + 1)) / 12);
+          glint.push(p.x, p.y, 0.19, q.x, q.y, 0.19);
         }
       }
-      const one = merge(solid(strap, 0.07, -0.14), lines(stitches));
-      const flip = one.clone().applyMatrix4(new Matrix4().makeScale(1, -1, 1));
-      return merge(bendAway(one, 1.15, 0.55), bendAway(flip, 1.15, 0.55));
+      return merge(hoop(DIAL_R, 0.19, v2(0, 0), 128), lines(glint));
     },
   },
+  { name: "strap", at: v2(0, 0), straight: true, build: () => merge(strap(1), strap(-1)) },
 ].map((p) => ({ ...p, layer: "case" as const }));
 
 const PARTS: PartDef[] = [...MOVEMENT, ...CASE];
+
+// --- Materials ------------------------------------------------------------------------------
+
+/** Forged carbon: chopped-fibre flakes pressed together, black with grey marbling. */
+function forgedCarbon() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 512;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#0c0c0c";
+  g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 900; i++) {
+    const x = rand(i * 3 + 1) * 512;
+    const y = rand(i * 3 + 2) * 512;
+    const len = 18 + rand(i * 5) * 70;
+    const wid = 4 + rand(i * 7) * 16;
+    const a = rand(i * 11) * Math.PI;
+    const shade = 16 + Math.floor(rand(i * 13) * 34);
+    g.save();
+    g.translate(x, y);
+    g.rotate(a);
+    g.globalAlpha = 0.55;
+    g.fillStyle = `rgb(${shade},${shade},${shade})`;
+    g.beginPath();
+    g.moveTo(-len / 2, 0);
+    g.quadraticCurveTo(0, -wid, len / 2, 0);
+    g.quadraticCurveTo(0, wid * 0.6, -len / 2, 0);
+    g.fill();
+    g.restore();
+  }
+  const t = new CanvasTexture(c);
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.repeat.set(1.6, 1.6);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}
+
+function fillMaterials() {
+  // Double-sided: the mirrored strap and bent lugs flip some faces.
+  const base = { transparent: true, opacity: 0, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
+  const carbon = forgedCarbon();
+  return {
+    steel: () => new MeshStandardMaterial({ ...base, color: 0x2c2c2e, roughness: 0.35, metalness: 0.55 }),
+    carbon: () => new MeshStandardMaterial({ ...base, map: carbon, roughness: 0.5, metalness: 0.15 }),
+    dial: () => new MeshStandardMaterial({ ...base, color: 0x0d0d0e, roughness: 0.7, metalness: 0.2 }),
+    rubber: () => new MeshStandardMaterial({ ...base, color: 0x121212, roughness: 0.95, metalness: 0 }),
+    dispose: () => carbon.dispose(),
+  };
+}
 
 // --- Scene ----------------------------------------------------------------------------------
 
 type Part = PartDef & {
   group: Group;
-  line: LineBasicMaterial;
+  materials: Material[];
+  edges: LineBasicMaterial;
+  shown: boolean;
   spin: number; // rotation it forms at, unwound as it drops in
 };
 
-/** Hand angles for the viewer's local time; the seconds hand steps four times a second. */
+/** Hand angles for the viewer's local time; the seconds hand moves in tenths of a second. */
 function handAngles(now: Date) {
-  const sec = now.getSeconds() + Math.floor(now.getMilliseconds() / 250) / 4;
+  const sec = now.getSeconds() + Math.floor(now.getMilliseconds() / 100) / 10;
   const min = now.getMinutes() + sec / 60;
   const hour = (now.getHours() % 12) + min / 60;
   return { hour: (-hour / 12) * TAU, minute: (-min / 60) * TAU, second: (-sec / 60) * TAU };
@@ -700,6 +768,13 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
   stage.setShift(1);
   camera.position.set(0, 0, DISTANCE);
 
+  scene.add(new AmbientLight(0xffffff, 0.7));
+  const key = new DirectionalLight(0xffffff, 2.2);
+  key.position.set(-2, 3, 4);
+  const rim = new DirectionalLight(0xffffff, 0.8);
+  rim.position.set(3, -1, 2);
+  scene.add(key, rim);
+
   const watch = new Group();
   const movement = new Group();
   movement.scale.setScalar(MOVEMENT_SCALE);
@@ -707,12 +782,25 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
   watch.add(movement);
   scene.add(watch);
 
+  const make = fillMaterials();
   const parts: Part[] = PARTS.map((def, i) => {
     const group = new Group();
-    const line = new LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false });
-    group.add(new LineSegments(merge(def.build()), line));
+    const piece = merge(def.build());
+    const edges = new LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false });
+    group.add(new LineSegments(piece, edges));
+
+    // Faces, merged per finish.
+    const materials: Material[] = [edges];
+    const byFill = new Map<Fill, BufferGeometry[]>();
+    for (const f of piece.userData.fills ?? []) byFill.set(f.fill, [...(byFill.get(f.fill) ?? []), f.g]);
+    for (const [fill, gs] of byFill) {
+      const mat = make[fill]();
+      materials.push(mat);
+      group.add(new Mesh(mergeGeometries(gs.map((g) => (g.index ? g.toNonIndexed() : g))), mat));
+    }
+
     (def.layer === "movement" ? movement : watch).add(group);
-    return { ...def, group, line, spin: def.straight ? 0 : (rand(i + 9) - 0.5) * 1.2 };
+    return { ...def, group, materials, edges, shown: false, spin: def.straight ? 0 : (rand(i + 9) - 0.5) * 1.2 };
   });
 
   const total = (parts.length - 1) * STAGGER + ASSEMBLE[1];
@@ -752,11 +840,22 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
 
     for (const [i, p] of parts.entries()) {
       const u = t - i * STAGGER;
-      const appear = clamp01((u - APPEAR[0]) / (APPEAR[1] - APPEAR[0]));
+      const appear = easeOutCubic(clamp01((u - APPEAR[0]) / (APPEAR[1] - APPEAR[0])));
       const drop = easeInOutCubic(clamp01((u - ASSEMBLE[0]) / (ASSEMBLE[1] - ASSEMBLE[0])));
 
-      p.line.opacity = (p.opacity ?? 0.95) * easeOutCubic(appear);
       p.group.visible = u > 0;
+      if (!p.shown) {
+        for (const m of p.materials) m.opacity = appear * (m === p.edges ? 0.6 : 1);
+        // Once fully in, faces turn opaque so they hide what's behind them.
+        if (appear >= 1) {
+          p.shown = true;
+          for (const m of p.materials) {
+            if (m === p.edges) continue;
+            m.transparent = false;
+            m.needsUpdate = true;
+          }
+        }
+      }
 
       // Assembled place: in the movement or case, or riding the turning cage.
       let x = p.at.x;
@@ -790,6 +889,7 @@ export function mount(canvas: HTMLCanvasElement, { gentle }: { gentle: boolean }
     seek: stage.seek,
     dispose() {
       view.disconnect();
+      make.dispose();
       stage.dispose();
     },
   };
